@@ -84,6 +84,9 @@ abstract class cm_field_rule extends base {
      * @return result
      */
     public function evaluate(\stdClass $course, array $params): result {
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
+
         $modname = clean_param(trim((string) ($params['modname'] ?? '')), PARAM_PLUGIN);
         $idnumber = trim((string) ($params['idnumber'] ?? ''));
         $field = trim((string) ($params['field'] ?? ''));
@@ -201,7 +204,7 @@ abstract class cm_field_rule extends base {
         $format = isset($instance->$formatfield) ? (int) $instance->$formatfield : FORMAT_HTML;
         $context = \context_module::instance((int) $cm->id);
         $filearea = $field === 'intro' ? 'intro' : $field;
-        $rewritten = file_rewrite_pluginfile_urls(
+        $rewritten = \file_rewrite_pluginfile_urls(
             $raw,
             'pluginfile.php',
             $context->id,

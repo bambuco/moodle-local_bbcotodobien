@@ -93,6 +93,9 @@ class section_date_label extends base {
      * @return result
      */
     public function evaluate(\stdClass $course, array $params): result {
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
+
         $label = trim((string) ($params['datelabel'] ?? ''));
         if ($label === '') {
             return $this->result_from_details([
@@ -136,7 +139,7 @@ class section_date_label extends base {
         \context_course $context
     ): detail {
         $name = get_section_name($course, $section);
-        $summary = file_rewrite_pluginfile_urls(
+        $summary = \file_rewrite_pluginfile_urls(
             (string) $section->summary,
             'pluginfile.php',
             $context->id,
