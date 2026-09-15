@@ -123,7 +123,7 @@ class engine {
             $params = $config->paramsdecoded ?? audit_type_manager::decode_params($config->params ?? '');
             return $rule->evaluate($course, $params);
         } catch (\Throwable $e) {
-            debugging($config->ruleclass . ': ' . $e->getMessage(), DEBUG_DEVELOPER, $e->getTraceAsString());
+            debugging($config->ruleclass . ': ' . $e->getMessage(), DEBUG_DEVELOPER, $e->getTrace());
             return new result(0.0, result::STATUS_ERROR, [
                 new detail(
                     base::GRANULARITY_COURSE,
