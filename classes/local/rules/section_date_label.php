@@ -136,7 +136,15 @@ class section_date_label extends base {
         \context_course $context
     ): detail {
         $name = get_section_name($course, $section);
-        $html = format_text((string) $section->summary, (int) $section->summaryformat, [
+        $summary = file_rewrite_pluginfile_urls(
+            (string) $section->summary,
+            'pluginfile.php',
+            $context->id,
+            'course',
+            'section',
+            $section->id
+        );
+        $html = format_text($summary, (int) $section->summaryformat, [
             'context' => $context,
             'filter' => true,
         ]);
