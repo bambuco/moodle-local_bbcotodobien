@@ -1,0 +1,57 @@
+/**
+ * Course report styles.
+ *
+ * @package    local_bbcotodobien
+ * @copyright  2026 David Herney @ BambuCo
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+.local-bbcotodobien-headeralert {
+    max-width: 72rem;
+    margin: 0.75rem auto;
+    position: absolute;
+    top: var(--navbar-height);
+    left: 0;
+    right: 0;
+    z-index: 999;
+}
+
+.local-bbcotodobien-current .accordion-button img,
+.local-bbcotodobien-current td img {
+    margin-right: 0.25rem;
+}
+
+.local-bbcotodobien-guidance {
+    max-width: 40rem;
+}
+
+.local-bbcotodobien-ruledetail  {
+
+    .local-bbcotodobien-status-pass {
+        --bs-accordion-btn-bg: var(--bs-success);
+        --bs-accordion-active-bg: var(--bs-success);
+        --bs-accordion-btn-color: var(--bs-white);
+        --bs-accordion-active-color: var(--bs-white);
+    }
+
+    .local-bbcotodobien-status-fail {
+        --bs-accordion-btn-bg: var(--bs-danger);
+        --bs-accordion-active-bg: var(--bs-danger);
+        --bs-accordion-btn-color: var(--bs-white);
+        --bs-accordion-active-color: var(--bs-white);
+    }
+
+    .local-bbcotodobien-status-error {
+        --bs-accordion-btn-bg: var(--bs-warning);
+        --bs-accordion-active-bg: var(--bs-warning);
+        --bs-accordion-btn-color: var(--bs-dark);
+        --bs-accordion-active-color: var(--bs-dark);
+    }
+
+    .local-bbcotodobien-status-pass,
+    .local-bbcotodobien-status-fail {
+        .accordion-button::after {
+            filter: brightness(0) invert(1);
+        }
+    }
+}

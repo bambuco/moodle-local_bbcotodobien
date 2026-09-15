@@ -1,0 +1,79 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+}}
+{{!
+    @template local_bbcotodobien/type_panel
+
+    One audit type and its rules.
+
+    Example context (json):
+    {
+        "id": 1,
+        "name": "Quality",
+        "compliance": "100.00",
+        "statuslabel": "Pass",
+        "statusicon": "",
+        "lastrun": "Monday",
+        "hasrules": true,
+        "rules": [],
+        "multipletypes": false
+    }
+}}
+{{#multipletypes}}
+<div class="accordion-item">
+    <h3 class="accordion-header" id="local-bbcotodobien-heading-{{id}}">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                data-bs-target="#local-bbcotodobien-collapse-{{id}}" aria-expanded="false"
+                aria-controls="local-bbcotodobien-collapse-{{id}}">
+            {{{statusicon}}} {{name}} — {{compliance}}% ({{statuslabel}})
+        </button>
+    </h3>
+    <div id="local-bbcotodobien-collapse-{{id}}" class="accordion-collapse collapse"
+         aria-labelledby="local-bbcotodobien-heading-{{id}}" data-bs-parent="#local-bbcotodobien-types">
+        <div class="accordion-body">
+{{/multipletypes}}
+{{^multipletypes}}
+<div class="local-bbcotodobien-typecard card mb-3">
+    <div class="card-header">
+        <h3 class="h5 mb-0">{{{statusicon}}} {{name}} — {{compliance}}% ({{statuslabel}})</h3>
+    </div>
+    <div class="card-body">
+{{/multipletypes}}
+            <p class="text-muted">{{#str}} lastrun, local_bbcotodobien {{/str}}: {{lastrun}}</p>
+            {{^hasrules}}
+                <p>{{#str}} norules, local_bbcotodobien {{/str}}</p>
+            {{/hasrules}}
+            {{#hasrules}}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>{{#str}} rulename, local_bbcotodobien {{/str}}</th>
+                                <th>{{#str}} ruleweighting, local_bbcotodobien {{/str}}</th>
+                                <th>{{#str}} compliance, local_bbcotodobien {{/str}}</th>
+                                <th>{{#str}} status {{/str}}</th>
+                                <th>{{#str}} actions {{/str}}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{#rules}}
+                                {{> local_bbcotodobien/rule_row}}
+                            {{/rules}}
+                        </tbody>
+                    </table>
+                </div>
+            {{/hasrules}}
+{{#multipletypes}}
+        </div>
+    </div>
+</div>
+{{/multipletypes}}
+{{^multipletypes}}
+    </div>
+</div>
+{{/multipletypes}}
