@@ -154,6 +154,24 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
     }
 
     /**
+     * Embedded @@PLUGINFILE@@ tokens in the summary must be rewritten before format_text().
+     */
+    public function test_section_date_label_rewrites_pluginfile_urls(): void {
+        $this->resetAfterTest();
+        $course = $this->create_course_with_sections(1);
+        $this->set_section_summary(
+            $course,
+            1,
+            '<p><img src="@@PLUGINFILE@@/banner.png" alt="" />Start: 15 March 2026</p>'
+        );
+
+        $result = (new section_date_label())->evaluate($course, ['datelabel' => 'Start:']);
+        $this->assertDebuggingNotCalled();
+        $this->assertSame(result::STATUS_PASS, $result->status);
+        $this->assertSame(result::STATUS_PASS, $result->details[0]->status);
+    }
+
+    /**
      * Section 0 is ignored; excluded numbered sections are skipped.
      */
     public function test_section_date_label_excludes_sections(): void {

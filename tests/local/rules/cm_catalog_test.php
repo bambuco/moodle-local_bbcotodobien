@@ -87,6 +87,23 @@ final class cm_catalog_test extends \advanced_testcase {
     }
 
     /**
+     * Embedded @@PLUGINFILE@@ tokens in activity content must be rewritten before format_text().
+     */
+    public function test_content_contains_rewrites_pluginfile_urls(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $this->create_page(
+            $course,
+            'GUIDE',
+            '<p><img src="@@PLUGINFILE@@/banner.png" alt="" />handbook</p>'
+        );
+
+        $result = (new cm_content_contains())->evaluate($course, $this->content_params('GUIDE', 'handbook'));
+        $this->assertDebuggingNotCalled();
+        $this->assertSame(result::STATUS_PASS, $result->status);
+    }
+
+    /**
      * Literal matching uses plain text after format_text.
      */
     public function test_content_contains_literal_pass_and_fail(): void {

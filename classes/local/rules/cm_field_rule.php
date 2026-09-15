@@ -182,7 +182,7 @@ abstract class cm_field_rule extends base {
             );
         }
 
-        [$html, $text] = $this->format_field($cm, $cm->instancerecord, $field);
+        [$html, $text] = $this->format_field($cm, $cm->instancerecord, $field, $modname);
         return $this->check_field($cm, $html, $text, $params);
     }
 
@@ -192,14 +192,25 @@ abstract class cm_field_rule extends base {
      * @param \stdClass $cm Course module record
      * @param \stdClass $instance Module instance
      * @param string $field Column name
+     * @param string $modname Module name
      * @return array{0: string, 1: string} Formatted HTML and plain text
      */
-    protected function format_field(\stdClass $cm, \stdClass $instance, string $field): array {
+    protected function format_field(\stdClass $cm, \stdClass $instance, string $field, string $modname): array {
         $raw = (string) ($instance->$field ?? '');
         $formatfield = $field . 'format';
         $format = isset($instance->$formatfield) ? (int) $instance->$formatfield : FORMAT_HTML;
-        $html = format_text($raw, $format, [
-            'context' => \context_module::instance((int) $cm->id),
+        $context = \context_module::instance((int) $cm->id);
+        $filearea = $field === 'intro' ? 'intro' : $field;
+        $rewritten = file_rewrite_pluginfile_urls(
+            $raw,
+            'pluginfile.php',
+            $context->id,
+            'mod_' . $modname,
+            $filearea,
+            0
+        );
+        $html = format_text($rewritten, $format, [
+            'context' => $context,
             'filter' => true,
         ]);
         $text = html_to_text($html, 75, false);
