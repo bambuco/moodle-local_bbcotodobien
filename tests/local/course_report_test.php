@@ -107,6 +107,36 @@ final class course_report_test extends \advanced_testcase {
     }
 
     /**
+     * Course guidance is formatted without Moodle text filters.
+     */
+    public function test_export_current_guidance_skips_filters(): void {
+        global $PAGE, $SESSION;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        filter_set_global_state('multilang', TEXTFILTER_ON);
+        $SESSION->forcelang = 'en';
+
+        $course = $this->getDataGenerator()->create_course();
+        $typeid = audit_type_manager::create_type('Quality');
+        audit_type_manager::create_rule_config($typeid, [
+            'ruleclass' => stub_rule::class,
+            'name' => get_string('stubrule', 'local_bbcotodobien'),
+            'mandatory' => true,
+            'guidance' => '<p>Use <span lang="en" class="multilang">Start:</span>'
+                . '<span lang="es" class="multilang">Inicio:</span></p>',
+            'guidanceformat' => FORMAT_HTML,
+            'params' => ['pass' => false],
+        ]);
+
+        $PAGE->set_url('/local/bbcotodobien/view.php', ['id' => $course->id]);
+        $data = course_report::export_current($course, $PAGE->get_renderer('core'), false);
+        $guidance = $data['types'][0]['rules'][0]['guidance'];
+        $this->assertTrue($data['types'][0]['rules'][0]['hasguidance']);
+        $this->assertStringContainsString('Start:', $guidance);
+        $this->assertStringContainsString('Inicio:', $guidance);
+    }
+
+    /**
      * Snapshot export is read-only and limited to that audit type.
      */
     public function test_export_current_snapshot_is_read_only(): void {

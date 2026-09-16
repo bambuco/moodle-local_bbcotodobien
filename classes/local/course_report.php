@@ -530,6 +530,9 @@ class course_report {
             'guidance',
             $config->id
         );
-        return format_text($rewritten, (int) $config->guidanceformat, ['context' => $syscontext]);
+        return format_text($rewritten, (int) $config->guidanceformat, [
+            'context' => $syscontext,
+            'filter' => false,
+        ]);
     }
 }
