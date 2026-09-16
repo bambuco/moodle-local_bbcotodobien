@@ -18,12 +18,11 @@
         "details": [
             {
                 "collapseid": "local-bbcotodobien-detail-1",
-                "targetname": "Course 1",
                 "evaluatedat": "Monday, 14 September 2026, 6:00 PM",
                 "status": "fail",
                 "statusclass": "local-bbcotodobien-status-fail",
                 "statuslabel": "Fail",
-                "details": "No grade category was found.",
+                "details": "The section summary does not contain the label \"Start:\".",
                 "expanded": true,
                 "hasfailinggroups": true,
                 "failinggroups": [
@@ -52,7 +51,7 @@
                         <button class="accordion-button{{^expanded}} collapsed{{/expanded}}" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#{{collapseid}}"
                                 aria-expanded="{{#expanded}}true{{/expanded}}{{^expanded}}false{{/expanded}}">
-                            {{targetname}} — {{statuslabel}}{{#evaluatedat}} — {{evaluatedat}}{{/evaluatedat}}
+                            {{statuslabel}}{{#evaluatedat}} - {{evaluatedat}}{{/evaluatedat}}
                         </button>
                     </h5>
                     <div id="{{collapseid}}"

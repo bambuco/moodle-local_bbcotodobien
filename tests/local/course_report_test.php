@@ -136,7 +136,7 @@ final class course_report_test extends \advanced_testcase {
     }
 
     /**
-     * Detail export expands only the first diagnostic item.
+     * Detail export uses one accordion item per evaluation and expands the first.
      */
     public function test_export_rule_detail_expands_first_item(): void {
         $this->resetAfterTest();
@@ -156,16 +156,13 @@ final class course_report_test extends \advanced_testcase {
         engine::run_audit($course->id, $typeid, 0);
         $data = course_report::export_rule_detail($course, $ruleid);
         $this->assertTrue($data['hasdetails']);
-        $this->assertCount(2, $data['details']);
+        $this->assertCount(1, $data['details']);
+        $this->assertArrayNotHasKey('targetname', $data['details'][0]);
         $this->assertTrue($data['details'][0]['expanded']);
-        $this->assertFalse($data['details'][1]['expanded']);
+        $this->assertSame(result::STATUS_FAIL, $data['details'][0]['status']);
         $this->assertSame('local-bbcotodobien-status-fail', $data['details'][0]['statusclass']);
-        $this->assertSame('local-bbcotodobien-status-pass', $data['details'][1]['statusclass']);
         $this->assertSame(get_string('stubrulefailed', 'local_bbcotodobien'), $data['details'][0]['details']);
-        $this->assertSame(get_string('stubrulepassed', 'local_bbcotodobien'), $data['details'][1]['details']);
         $this->assertTrue($data['details'][0]['hasfailinggroups']);
-        $this->assertTrue($data['details'][1]['hasfailinggroups']);
-        $this->assertSame($data['details'][0]['failinggroups'], $data['details'][1]['failinggroups']);
         $this->assertCount(1, $data['details'][0]['failinggroups']);
         $this->assertSame(
             get_string('rulefailingsections_list', 'local_bbcotodobien'),
@@ -196,10 +193,11 @@ final class course_report_test extends \advanced_testcase {
         ]);
         engine::run_audit($course->id, $typeid, 0);
         $data = course_report::export_rule_detail($course, $ruleid);
-        $this->assertCount(2, $data['details']);
+        $this->assertCount(1, $data['details']);
+        $this->assertSame(result::STATUS_PASS, $data['details'][0]['status']);
         $this->assertFalse($data['details'][0]['hasfailinggroups']);
-        $this->assertFalse($data['details'][1]['hasfailinggroups']);
         $this->assertSame([], $data['details'][0]['failinggroups']);
+        $this->assertSame(get_string('stubrulepassed', 'local_bbcotodobien'), $data['details'][0]['details']);
     }
 
     /**
@@ -242,28 +240,26 @@ final class course_report_test extends \advanced_testcase {
         engine::run_rule($course->id, $ruleid, 0);
 
         $data = course_report::export_rule_detail($course, $ruleid);
-        $this->assertCount(4, $data['details']);
+        $this->assertCount(2, $data['details']);
 
-        $this->assertSame('NewFail', $data['details'][0]['targetname']);
+        $this->assertTrue($data['details'][0]['expanded']);
         $this->assertTrue($data['details'][0]['hasfailinggroups']);
         $this->assertSame('NewFail', $data['details'][0]['failinggroups'][0]['items'][0]['name']);
         $this->assertSame(
             get_string('rulefailingactivities_list', 'local_bbcotodobien'),
             $data['details'][0]['failinggroups'][0]['intro']
         );
-        $this->assertSame($data['details'][0]['failinggroups'], $data['details'][1]['failinggroups']);
 
-        $this->assertSame('OldFail', $data['details'][2]['targetname']);
-        $this->assertTrue($data['details'][2]['hasfailinggroups']);
-        $this->assertSame('OldFail', $data['details'][2]['failinggroups'][0]['items'][0]['name']);
+        $this->assertFalse($data['details'][1]['expanded']);
+        $this->assertTrue($data['details'][1]['hasfailinggroups']);
+        $this->assertSame('OldFail', $data['details'][1]['failinggroups'][0]['items'][0]['name']);
         $this->assertSame(
             get_string('rulefailingsections_list', 'local_bbcotodobien'),
-            $data['details'][2]['failinggroups'][0]['intro']
+            $data['details'][1]['failinggroups'][0]['intro']
         );
-        $this->assertSame($data['details'][2]['failinggroups'], $data['details'][3]['failinggroups']);
         $this->assertNotEquals(
             $data['details'][0]['failinggroups'][0]['items'][0]['name'],
-            $data['details'][2]['failinggroups'][0]['items'][0]['name']
+            $data['details'][1]['failinggroups'][0]['items'][0]['name']
         );
     }
 
@@ -294,18 +290,25 @@ final class course_report_test extends \advanced_testcase {
         engine::run_audit($course->id, $typeid, 0);
 
         $data = course_report::export_rule_detail($course, $ruleid);
-        $this->assertCount(2, $data['details']);
+        $this->assertCount(1, $data['details']);
+        $this->assertSame(result::STATUS_FAIL, $data['details'][0]['status']);
         $this->assertTrue($data['details'][0]['hasfailinggroups']);
-        $this->assertTrue($data['details'][1]['hasfailinggroups']);
         $group = $data['details'][0]['failinggroups'][0];
         $this->assertSame(
             get_string('rulesectiondatelabel_fail_nolabel_list', 'local_bbcotodobien', 'Inicio:'),
             $group['intro']
         );
-        $this->assertCount(1, $group['items']);
+        $urls = array_column($group['items'], 'url');
+        $this->assertNotEmpty($urls);
         $this->assertTrue($group['items'][0]['hasurl']);
-        $this->assertStringContainsString('section.php', $group['items'][0]['url']);
-        $this->assertStringContainsString('id=' . $sectiontwo->id, $group['items'][0]['url']);
+        $matched = false;
+        foreach ($group['items'] as $item) {
+            if (str_contains($item['url'], 'id=' . $sectiontwo->id)) {
+                $matched = true;
+                $this->assertStringContainsString('section.php', $item['url']);
+            }
+        }
+        $this->assertTrue($matched);
     }
 
     /**
@@ -338,10 +341,9 @@ final class course_report_test extends \advanced_testcase {
         $data = course_report::export_rule_detail($course, $ruleid);
         $this->assertTrue($data['hasdetails']);
         $this->assertCount(2, $data['details']);
-        $this->assertSame('Second', $data['details'][0]['targetname']);
+        $this->assertArrayNotHasKey('targetname', $data['details'][0]);
         $this->assertSame(result::STATUS_PASS, $data['details'][0]['status']);
         $this->assertTrue($data['details'][0]['expanded']);
-        $this->assertSame('First', $data['details'][1]['targetname']);
         $this->assertSame(result::STATUS_FAIL, $data['details'][1]['status']);
         $this->assertFalse($data['details'][1]['expanded']);
         $this->assertNotEmpty($data['details'][0]['evaluatedat']);
@@ -351,6 +353,107 @@ final class course_report_test extends \advanced_testcase {
         $this->assertFalse($data['details'][0]['hasfailinggroups']);
         $this->assertTrue($data['details'][1]['hasfailinggroups']);
         $this->assertSame('First', $data['details'][1]['failinggroups'][0]['items'][0]['name']);
+    }
+
+    /**
+     * A found grade category that fails includes a live gradebook URL.
+     */
+    public function test_export_rule_detail_gradebook_failure_includes_category_url(): void {
+        global $CFG;
+        $this->resetAfterTest();
+        require_once($CFG->libdir . '/gradelib.php');
+
+        $course = $this->getDataGenerator()->create_course();
+        $record = $this->getDataGenerator()->create_grade_category([
+            'courseid' => $course->id,
+            'fullname' => 'Activities',
+        ]);
+        $category = \grade_category::fetch(['id' => $record->id]);
+        $item = $category->load_grade_item();
+        $item->idnumber = 'ACT';
+        $item->update();
+        $this->getDataGenerator()->create_grade_item([
+            'courseid' => $course->id,
+            'categoryid' => $category->id,
+            'itemtype' => 'manual',
+            'itemname' => 'Manual',
+        ]);
+
+        $typeid = audit_type_manager::create_type('Quality');
+        $ruleid = audit_type_manager::create_rule_config($typeid, [
+            'ruleclass' => \local_bbcotodobien\local\rules\grade_category_moditems::class,
+            'name' => 'Grade items',
+            'mandatory' => true,
+            'params' => ['idnumber' => 'ACT'],
+        ]);
+        engine::run_audit($course->id, $typeid, 0);
+
+        $data = course_report::export_rule_detail($course, $ruleid);
+        $this->assertCount(1, $data['details']);
+        $this->assertSame(result::STATUS_FAIL, $data['details'][0]['status']);
+        $this->assertTrue($data['details'][0]['hasfailinggroups']);
+        $this->assertSame(
+            get_string('rulegradecategorymoditems_fail_list', 'local_bbcotodobien'),
+            $data['details'][0]['failinggroups'][0]['intro']
+        );
+        $this->assertCount(1, $data['details'][0]['failinggroups'][0]['items']);
+        $link = $data['details'][0]['failinggroups'][0]['items'][0];
+        $this->assertTrue($link['hasurl']);
+        $this->assertStringContainsString('grade/edit/tree/category.php', $link['url']);
+        $this->assertStringContainsString('courseid=' . $course->id, $link['url']);
+        $this->assertStringContainsString('id=' . $category->id, $link['url']);
+    }
+
+    /**
+     * Missing activities and missing grade categories have no resource link.
+     */
+    public function test_export_rule_detail_missing_resource_has_no_failing_link(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $typeid = audit_type_manager::create_type('Quality');
+
+        $cmruleid = audit_type_manager::create_rule_config($typeid, [
+            'ruleclass' => \local_bbcotodobien\local\rules\cm_content_contains::class,
+            'name' => 'Contains',
+            'mandatory' => true,
+            'params' => [
+                'modname' => 'page',
+                'idnumber' => 'MISSING',
+                'field' => 'content',
+                'pattern' => 'Hello',
+                'matchmode' => \local_bbcotodobien\local\rules\cm_field_rule::MATCH_LITERAL,
+            ],
+        ]);
+        $graderuleid = audit_type_manager::create_rule_config($typeid, [
+            'ruleclass' => \local_bbcotodobien\local\rules\grade_category_moditems::class,
+            'name' => 'Grade items',
+            'mandatory' => true,
+            'params' => ['idnumber' => 'MISSING'],
+        ]);
+        engine::run_audit($course->id, $typeid, 0);
+
+        $cmdata = course_report::export_rule_detail($course, $cmruleid);
+        $this->assertCount(1, $cmdata['details']);
+        $this->assertSame(result::STATUS_FAIL, $cmdata['details'][0]['status']);
+        $this->assertFalse($cmdata['details'][0]['hasfailinggroups']);
+        $this->assertSame([], $cmdata['details'][0]['failinggroups']);
+        $this->assertSame(
+            get_string('rulenomatches', 'local_bbcotodobien', (object) [
+                'modname' => 'page',
+                'idnumber' => 'MISSING',
+            ]),
+            $cmdata['details'][0]['details']
+        );
+
+        $gradedata = course_report::export_rule_detail($course, $graderuleid);
+        $this->assertCount(1, $gradedata['details']);
+        $this->assertSame(result::STATUS_FAIL, $gradedata['details'][0]['status']);
+        $this->assertFalse($gradedata['details'][0]['hasfailinggroups']);
+        $this->assertSame([], $gradedata['details'][0]['failinggroups']);
+        $this->assertSame(
+            get_string('rulegradecategorymissing', 'local_bbcotodobien', 'MISSING'),
+            $gradedata['details'][0]['details']
+        );
     }
 
     /**

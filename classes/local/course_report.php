@@ -173,31 +173,19 @@ class course_report {
                 ? factory::create($config->ruleclass)
                 : null;
             foreach ($results as $stored) {
-                $evaluatedat = userdate((int) $stored->timecreated);
                 $rows = writer::get_rule_details((int) $stored->id);
                 $failinggroups = self::build_failing_groups($course, $rule, $rows);
-                foreach ($rows as $row) {
-                    $detail = detail::from_storage(
-                        $row->targettype,
-                        (int) $row->targetid,
-                        $row->targetname,
-                        $row->status,
-                        (string) $row->details
-                    );
-                    $html = $rule ? $rule->render_detail($detail) : base::format_detail($detail);
-                    $details[] = [
-                        'collapseid' => 'local-bbcotodobien-detail-' . $row->id,
-                        'targetname' => format_string($row->targetname),
-                        'evaluatedat' => $evaluatedat,
-                        'status' => $row->status,
-                        'statusclass' => 'local-bbcotodobien-status-' . $row->status,
-                        'statuslabel' => self::get_status_label($row->status),
-                        'details' => $html,
-                        'expanded' => $details === [],
-                        'hasfailinggroups' => $failinggroups !== [],
-                        'failinggroups' => $failinggroups,
-                    ];
-                }
+                $details[] = [
+                    'collapseid' => 'local-bbcotodobien-detail-' . $stored->id,
+                    'evaluatedat' => userdate((int) $stored->timecreated),
+                    'status' => $stored->status,
+                    'statusclass' => 'local-bbcotodobien-status-' . $stored->status,
+                    'statuslabel' => self::get_status_label($stored->status),
+                    'details' => self::render_execution_messages($rule, $rows, $failinggroups !== []),
+                    'expanded' => $details === [],
+                    'hasfailinggroups' => $failinggroups !== [],
+                    'failinggroups' => $failinggroups,
+                ];
             }
         }
 
@@ -209,7 +197,66 @@ class course_report {
     }
 
     /**
-     * Group failing section/cm details for the list shown in the accordion body.
+     * Unique formative messages for one evaluation.
+     *
+     * Listed section, activity and gradebook targets that passed are omitted when
+     * the execution already has a failing list. Course-level "not found" messages
+     * are kept so the accordion body is not empty.
+     *
+     * @param base|null $rule Rule instance, or null when the class is unavailable
+     * @param \stdClass[] $rows Stored rule_detail rows for one evaluation
+     * @param bool $hasfailinggroups Whether failing targets are listed separately
+     * @return string HTML
+     */
+    protected static function render_execution_messages(?base $rule, array $rows, bool $hasfailinggroups): string {
+        $htmlparts = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $listed = self::is_listable_fail_target($row->targettype);
+            if (
+                $listed
+                && $hasfailinggroups
+                && $row->status !== result::STATUS_FAIL
+                && $row->status !== result::STATUS_ERROR
+            ) {
+                continue;
+            }
+
+            $detail = detail::from_storage(
+                $row->targettype,
+                (int) $row->targetid,
+                $row->targetname,
+                $row->status,
+                (string) $row->details
+            );
+            $identifier = (string) ($detail->fields['identifier'] ?? '');
+            $key = $identifier !== '' ? $identifier : 'row-' . $row->id;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $htmlparts[] = $rule ? $rule->render_detail($detail) : base::format_detail($detail);
+        }
+        return implode('<br />', $htmlparts);
+    }
+
+    /**
+     * Whether failing targets of this type are listed with optional URLs.
+     *
+     * @param string $targettype Target type
+     * @return bool
+     */
+    protected static function is_listable_fail_target(string $targettype): bool {
+        return $targettype === base::GRANULARITY_SECTION
+            || $targettype === base::GRANULARITY_CM
+            || $targettype === base::GRANULARITY_GRADEBOOK;
+    }
+
+    /**
+     * Group failing found resources for the list shown in the accordion body.
+     *
+     * Course-level "not found" details are omitted: there is no resource to link.
+     * Gradebook details are included only when the category still exists.
      *
      * @param \stdClass $course Course record
      * @param base|null $rule Rule instance, or null when the class is unavailable
@@ -222,7 +269,7 @@ class course_report {
             if ($row->status !== result::STATUS_FAIL) {
                 continue;
             }
-            if ($row->targettype !== base::GRANULARITY_SECTION && $row->targettype !== base::GRANULARITY_CM) {
+            if (!self::is_listable_fail_target($row->targettype)) {
                 continue;
             }
 
@@ -233,26 +280,29 @@ class course_report {
                 $row->status,
                 (string) $row->details
             );
+            $category = $row->targettype === base::GRANULARITY_GRADEBOOK
+                ? self::find_grade_category($course, (string) ($detail->fields['idnumber'] ?? ''))
+                : null;
+            $url = self::get_target_url($course, $row->targettype, (int) $row->targetid, $detail, $category);
+            if ($row->targettype === base::GRANULARITY_GRADEBOOK && $url === null) {
+                continue;
+            }
+
             $identifier = (string) ($detail->fields['identifier'] ?? '');
             $groupkey = $identifier !== '' ? $identifier : $row->targettype;
             if (!isset($groups[$groupkey])) {
                 $intro = $rule
                     ? $rule->render_failing_list_intro($detail)
-                    : get_string(
-                        $detail->targettype === base::GRANULARITY_SECTION
-                            ? 'rulefailingsections_list'
-                            : 'rulefailingactivities_list',
-                        'local_bbcotodobien'
-                    );
+                    : self::failing_list_intro_fallback($detail);
                 $groups[$groupkey] = [
                     'intro' => $intro,
                     'items' => [],
                 ];
             }
 
-            $url = self::get_target_url($course, $row->targettype, (int) $row->targetid);
+            $name = $category ? $category->fullname : $row->targetname;
             $groups[$groupkey]['items'][] = [
-                'name' => format_string($row->targetname),
+                'name' => format_string($name),
                 'url' => $url ? $url->out(false) : '',
                 'hasurl' => $url !== null,
             ];
@@ -262,15 +312,57 @@ class course_report {
     }
 
     /**
-     * Resolve a live URL for a section or course module target.
+     * Generic list intro when the rule class is unavailable.
+     *
+     * @param detail $detail Sample failing detail
+     * @return string
+     */
+    protected static function failing_list_intro_fallback(detail $detail): string {
+        return match ($detail->targettype) {
+            base::GRANULARITY_SECTION => get_string('rulefailingsections_list', 'local_bbcotodobien'),
+            base::GRANULARITY_GRADEBOOK => get_string('rulefailinggradebook_list', 'local_bbcotodobien'),
+            default => get_string('rulefailingactivities_list', 'local_bbcotodobien'),
+        };
+    }
+
+    /**
+     * Resolve a live URL for a found section, activity or grade category.
+     *
+     * Course targets always return null: they represent a missing resource.
      *
      * @param \stdClass $course Course record
      * @param string $targettype Target type
      * @param int $targetid Target id
+     * @param detail|null $detail Stored detail, used for gradebook idnumber
+     * @param \grade_category|null $category Already resolved grade category
      * @return \moodle_url|null
      */
-    protected static function get_target_url(\stdClass $course, string $targettype, int $targetid): ?\moodle_url {
+    protected static function get_target_url(
+        \stdClass $course,
+        string $targettype,
+        int $targetid,
+        ?detail $detail = null,
+        ?\grade_category $category = null
+    ): ?\moodle_url {
         global $CFG;
+
+        if ($targettype === base::GRANULARITY_COURSE) {
+            return null;
+        }
+
+        if ($targettype === base::GRANULARITY_GRADEBOOK) {
+            if (!$category && $detail) {
+                $category = self::find_grade_category($course, (string) ($detail->fields['idnumber'] ?? ''));
+            }
+            if (!$category) {
+                return null;
+            }
+            return new \moodle_url('/grade/edit/tree/category.php', [
+                'courseid' => (int) $course->id,
+                'id' => (int) $category->id,
+            ]);
+        }
+
         require_once($CFG->dirroot . '/course/lib.php');
 
         if ($targetid <= 0) {
@@ -303,6 +395,43 @@ class course_report {
         }
 
         return null;
+    }
+
+    /**
+     * Fetch a grade category by the idnumber stored on its category grade item.
+     *
+     * @param \stdClass $course Course record
+     * @param string $idnumber Category idnumber
+     * @return \grade_category|null
+     */
+    protected static function find_grade_category(\stdClass $course, string $idnumber): ?\grade_category {
+        global $CFG, $DB;
+
+        $idnumber = trim($idnumber);
+        if ($idnumber === '') {
+            return null;
+        }
+
+        require_once($CFG->libdir . '/gradelib.php');
+        $items = $DB->get_records(
+            'grade_items',
+            [
+                'courseid' => (int) $course->id,
+                'itemtype' => 'category',
+                'idnumber' => $idnumber,
+            ],
+            'id ASC',
+            '*',
+            0,
+            1
+        );
+        $item = $items ? reset($items) : false;
+        if (!$item) {
+            return null;
+        }
+
+        $category = \grade_category::fetch(['id' => $item->iteminstance, 'courseid' => (int) $course->id]);
+        return $category ?: null;
     }
 
     /**

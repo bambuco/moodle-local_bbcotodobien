@@ -206,10 +206,10 @@ abstract class base {
     }
 
     /**
-     * Intro text for a grouped list of failing section or activity targets.
+     * Intro text for a grouped list of failing found resources.
      *
      * Prefers a rule-specific "{identifier}_list" string; otherwise uses a
-     * generic sections or activities list string.
+     * generic sections, activities or gradebook list string.
      *
      * @param detail $detail Sample failing detail from the group
      * @return string
@@ -231,6 +231,9 @@ abstract class base {
 
         if ($detail->targettype === self::GRANULARITY_SECTION) {
             return get_string('rulefailingsections_list', 'local_bbcotodobien');
+        }
+        if ($detail->targettype === self::GRANULARITY_GRADEBOOK) {
+            return get_string('rulefailinggradebook_list', 'local_bbcotodobien');
         }
         return get_string('rulefailingactivities_list', 'local_bbcotodobien');
     }
