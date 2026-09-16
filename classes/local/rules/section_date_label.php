@@ -60,7 +60,7 @@ class section_date_label extends base {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['datelabel', 'excludesections', 'skipfilters'];
+        return ['datelabel', 'excludesections', 'includehiddensections', 'skipfilters'];
     }
 
     /**
@@ -83,11 +83,12 @@ class section_date_label extends base {
         $mform->addHelpButton('datelabel', 'ruledatelabel', 'local_bbcotodobien');
         $mform->addRule('datelabel', get_string('required'), 'required', null, 'client');
         section_helper::add_exclude_element($mform);
+        section_helper::add_includehiddensections_element($mform);
         $this->add_skipfilters_element($mform);
     }
 
     /**
-     * Evaluate numbered sections.
+     * Evaluate course sections.
      *
      * @param \stdClass $course Course record
      * @param array $params Decoded rule parameters
@@ -111,7 +112,11 @@ class section_date_label extends base {
         }
 
         $excluded = section_helper::parse_excluded_sections($params['excludesections'] ?? '');
-        $sections = section_helper::get_numbered_sections($course, $excluded);
+        $sections = section_helper::get_numbered_sections(
+            $course,
+            $excluded,
+            !empty($params['includehiddensections'])
+        );
         if (!$sections) {
             return $this->result_from_details([]);
         }

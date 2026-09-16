@@ -72,6 +72,19 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
     }
 
     /**
+     * Set course-section visibility (course_sections.visible).
+     *
+     * @param \stdClass $course Course
+     * @param int $sectionnum Section number
+     * @param int $visible 1 visible, 0 hidden
+     */
+    private function set_section_visible(\stdClass $course, int $sectionnum, int $visible): void {
+        $section = get_fast_modinfo($course)->get_section_info($sectionnum);
+        course_update_section($course, $section, ['visible' => $visible]);
+        rebuild_course_cache($course->id, true);
+    }
+
+    /**
      * Create a grade category and set its item idnumber.
      *
      * @param \stdClass $course Course
@@ -134,8 +147,9 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
         $this->set_section_summary($course, 1, '<p>Start: 15 March 2026 extra</p>');
         $this->set_section_summary($course, 2, '<p>No schedule here</p>');
         $rule = new section_date_label();
+        $base = ['datelabel' => 'start:', 'excludesections' => '0'];
 
-        $result = $rule->evaluate($course, ['datelabel' => 'start:']);
+        $result = $rule->evaluate($course, $base);
         $this->assertCount(2, $result->details);
         $this->assertSame(50.0, $result->compliance);
         $this->assertSame(result::STATUS_FAIL, $result->status);
@@ -143,7 +157,7 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
         $this->assertSame(result::STATUS_FAIL, $result->details[1]->status);
 
         $this->set_section_summary($course, 2, '<p>START: soon</p>');
-        $nodate = $rule->evaluate($course, ['datelabel' => 'Start:']);
+        $nodate = $rule->evaluate($course, ['datelabel' => 'Start:', 'excludesections' => '0']);
         $this->assertSame(result::STATUS_FAIL, $nodate->details[1]->status);
         $this->assertSame('rulesectiondatelabel_fail_nodate', $nodate->details[1]->fields['identifier']);
         $this->assertSame('Start:', $nodate->details[1]->fields['label']);
@@ -165,28 +179,72 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
             '<p><img src="@@PLUGINFILE@@/banner.png" alt="" />Start: 15 March 2026</p>'
         );
 
-        $result = (new section_date_label())->evaluate($course, ['datelabel' => 'Start:']);
+        $result = (new section_date_label())->evaluate($course, [
+            'datelabel' => 'Start:',
+            'excludesections' => '0',
+        ]);
         $this->assertDebuggingNotCalled();
         $this->assertSame(result::STATUS_PASS, $result->status);
         $this->assertSame(result::STATUS_PASS, $result->details[0]->status);
     }
 
     /**
-     * Section 0 is ignored; excluded numbered sections are skipped.
+     * Excluded section numbers are skipped, including section 0 when listed.
      */
     public function test_section_date_label_excludes_sections(): void {
         $this->resetAfterTest();
         $course = $this->create_course_with_sections(2);
-        $this->set_section_summary($course, 0, '<p>Ignored</p>');
+        $this->set_section_summary($course, 0, '<p>Start: 2026-03-01</p>');
         $this->set_section_summary($course, 1, '<p>Start: 2026-04-01</p>');
         $this->set_section_summary($course, 2, '<p>Missing</p>');
 
         $result = (new section_date_label())->evaluate($course, [
             'datelabel' => 'Start:',
-            'excludesections' => '2',
+            'excludesections' => '0,2',
         ]);
         $this->assertCount(1, $result->details);
         $this->assertSame(result::STATUS_PASS, $result->status);
+    }
+
+    /**
+     * Section 0 is evaluated like any other section.
+     */
+    public function test_section_date_label_evaluates_section_zero(): void {
+        $this->resetAfterTest();
+        $course = $this->create_course_with_sections(0);
+        $this->set_section_summary($course, 0, '<p>Start: 15 March 2026</p>');
+
+        $pass = (new section_date_label())->evaluate($course, ['datelabel' => 'Start:']);
+        $this->assertCount(1, $pass->details);
+        $this->assertSame(result::STATUS_PASS, $pass->status);
+
+        $excluded = (new section_date_label())->evaluate($course, [
+            'datelabel' => 'Start:',
+            'excludesections' => '0',
+        ]);
+        $this->assertSame(result::STATUS_NA, $excluded->status);
+        $this->assertSame([], $excluded->details);
+    }
+
+    /**
+     * Hidden sections are skipped unless includehiddensections is enabled.
+     */
+    public function test_section_date_label_includehiddensections(): void {
+        $this->resetAfterTest();
+        $course = $this->create_course_with_sections(2);
+        $this->set_section_summary($course, 1, '<p>Start: 15 March 2026</p>');
+        $this->set_section_summary($course, 2, '<p>Start: 20 March 2026</p>');
+        $this->set_section_visible($course, 2, 0);
+        $rule = new section_date_label();
+        $base = ['datelabel' => 'Start:', 'excludesections' => '0'];
+
+        $visibleonly = $rule->evaluate($course, $base);
+        $this->assertCount(1, $visibleonly->details);
+        $this->assertSame(result::STATUS_PASS, $visibleonly->status);
+
+        $withhidden = $rule->evaluate($course, $base + ['includehiddensections' => 1]);
+        $this->assertCount(2, $withhidden->details);
+        $this->assertSame(result::STATUS_PASS, $withhidden->status);
     }
 
     /**
@@ -208,31 +266,33 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
                 . '<span lang="xx" class="multilang">Start: 15 March 2026</span></p>'
         );
         $rule = new section_date_label();
+        $base = ['datelabel' => 'Start:', 'excludesections' => '0'];
 
-        $filtered = $rule->evaluate($course, ['datelabel' => 'Start:']);
+        $filtered = $rule->evaluate($course, $base);
         $this->assertSame(result::STATUS_FAIL, $filtered->status);
         $this->assertSame('rulesectiondatelabel_fail_nolabel', $filtered->details[0]->fields['identifier']);
 
-        $unfiltered = $rule->evaluate($course, ['datelabel' => 'Start:', 'skipfilters' => 1]);
+        $unfiltered = $rule->evaluate($course, $base + ['skipfilters' => 1]);
         $this->assertSame(result::STATUS_PASS, $unfiltered->status);
         $this->assertSame(result::STATUS_PASS, $unfiltered->details[0]->status);
     }
 
     /**
-     * Courses with only section 0 are not applicable.
+     * A course with only section 0 still evaluates that section.
      */
-    public function test_section_rules_are_na_without_numbered_sections(): void {
+    public function test_section_date_label_with_only_section_zero(): void {
         $this->resetAfterTest();
         $course = $this->create_course_with_sections(0);
 
-        $label = (new section_date_label())->evaluate($course, ['datelabel' => 'Start:']);
-        $this->assertSame(result::STATUS_NA, $label->status);
-        $this->assertSame(100.0, $label->compliance);
-        $this->assertSame([], $label->details);
+        $fail = (new section_date_label())->evaluate($course, ['datelabel' => 'Start:']);
+        $this->assertCount(1, $fail->details);
+        $this->assertSame(result::STATUS_FAIL, $fail->status);
+        $this->assertSame('rulesectiondatelabel_fail_nolabel', $fail->details[0]->fields['identifier']);
 
         $dates = (new section_activity_dates())->evaluate($course, []);
         $this->assertSame(result::STATUS_NA, $dates->status);
         $this->assertSame(100.0, $dates->compliance);
+        $this->assertSame([], $dates->details);
     }
 
     /**
@@ -300,6 +360,33 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
         $result = (new section_activity_dates())->evaluate($course, ['excludesections' => '2']);
         $this->assertSame(result::STATUS_NA, $result->status);
         $this->assertSame(100.0, $result->compliance);
+    }
+
+    /**
+     * Hidden sections are skipped unless includehiddensections is enabled.
+     */
+    public function test_section_activity_dates_includehiddensections(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->create_course_with_sections(2);
+        $this->getDataGenerator()->create_module('assign', [
+            'course' => $course->id,
+            'section' => 2,
+            'allowsubmissionsfromdate' => 0,
+            'duedate' => 0,
+        ]);
+        $this->set_section_visible($course, 2, 0);
+
+        $visibleonly = (new section_activity_dates())->evaluate($course, ['excludesections' => '0']);
+        $this->assertSame(result::STATUS_NA, $visibleonly->status);
+        $this->assertSame([], $visibleonly->details);
+
+        $withhidden = (new section_activity_dates())->evaluate($course, [
+            'excludesections' => '0',
+            'includehiddensections' => 1,
+        ]);
+        $this->assertCount(1, $withhidden->details);
+        $this->assertSame(result::STATUS_FAIL, $withhidden->status);
     }
 
     /**

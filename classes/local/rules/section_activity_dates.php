@@ -60,7 +60,7 @@ class section_activity_dates extends base {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['excludesections'];
+        return ['excludesections', 'includehiddensections'];
     }
 
     /**
@@ -70,10 +70,11 @@ class section_activity_dates extends base {
      */
     public function add_config_form_elements($mform): void {
         section_helper::add_exclude_element($mform);
+        section_helper::add_includehiddensections_element($mform);
     }
 
     /**
-     * Evaluate activities in numbered sections.
+     * Evaluate activities in course sections.
      *
      * @param \stdClass $course Course record
      * @param array $params Decoded rule parameters
@@ -81,7 +82,11 @@ class section_activity_dates extends base {
      */
     public function evaluate(\stdClass $course, array $params): result {
         $excluded = section_helper::parse_excluded_sections($params['excludesections'] ?? '');
-        $sections = section_helper::get_numbered_sections($course, $excluded);
+        $sections = section_helper::get_numbered_sections(
+            $course,
+            $excluded,
+            !empty($params['includehiddensections'])
+        );
         if (!$sections) {
             return $this->result_from_details([]);
         }

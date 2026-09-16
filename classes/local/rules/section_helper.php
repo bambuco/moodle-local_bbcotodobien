@@ -27,6 +27,9 @@ class section_helper {
     /**
      * Parse excluded section numbers from a CSV param.
      *
+     * Accepts non-negative integers including 0. Empty tokens and non-digit
+     * values are ignored.
+     *
      * @param array|string $value Raw param
      * @return int[]
      */
@@ -38,29 +41,41 @@ class section_helper {
         }
         $excluded = [];
         foreach ($parts as $part) {
-            $number = (int) trim((string) $part);
-            if ($number > 0) {
-                $excluded[$number] = $number;
+            $token = trim((string) $part);
+            if ($token === '' || !preg_match('/^\d+$/', $token)) {
+                continue;
             }
+            $number = (int) $token;
+            $excluded[$number] = $number;
         }
         return array_values($excluded);
     }
 
     /**
-     * Return course sections with number > 0, minus exclusions.
+     * Return course sections minus exclusions and optionally hidden ones.
      *
-     * Hidden sections are included.
+     * Section 0 is included like any other section. Hidden sections
+     * (course_sections.visible = 0) are omitted unless $includehidden is true.
+     * Availability conditions are not considered.
      *
      * @param \stdClass $course Course record
      * @param int[] $excluded Section numbers to skip
+     * @param bool $includehidden Whether to include sections with visible = 0
      * @return \section_info[]
      */
-    public static function get_numbered_sections(\stdClass $course, array $excluded = []): array {
+    public static function get_numbered_sections(
+        \stdClass $course,
+        array $excluded = [],
+        bool $includehidden = false
+    ): array {
         $modinfo = get_fast_modinfo($course);
         $sections = [];
         foreach ($modinfo->get_section_info_all() as $section) {
             $number = (int) $section->sectionnum;
-            if ($number <= 0 || in_array($number, $excluded, true)) {
+            if (in_array($number, $excluded, true)) {
+                continue;
+            }
+            if (!$includehidden && (int) $section->visible === 0) {
                 continue;
             }
             $sections[$number] = $section;
@@ -83,5 +98,20 @@ class section_helper {
         );
         $mform->setType('excludesections', PARAM_TEXT);
         $mform->addHelpButton('excludesections', 'ruleexcludesections', 'local_bbcotodobien');
+    }
+
+    /**
+     * Add the shared include-hidden-sections checkbox to a form.
+     *
+     * @param \MoodleQuickForm $mform Form to extend
+     */
+    public static function add_includehiddensections_element($mform): void {
+        $mform->addElement(
+            'advcheckbox',
+            'includehiddensections',
+            get_string('ruleincludehiddensections', 'local_bbcotodobien')
+        );
+        $mform->setDefault('includehiddensections', 0);
+        $mform->addHelpButton('includehiddensections', 'ruleincludehiddensections', 'local_bbcotodobien');
     }
 }
