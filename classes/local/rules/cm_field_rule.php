@@ -185,20 +185,29 @@ abstract class cm_field_rule extends base {
             );
         }
 
-        [$html, $text] = $this->format_field($cm, $cm->instancerecord, $field, $modname);
+        [$html, $text] = $this->format_field($cm, $cm->instancerecord, $field, $modname, $params);
         return $this->check_field($cm, $html, $text, $params);
     }
 
     /**
-     * Format a module field through Moodle filters and return HTML plus plain text.
+     * Format a module field and return HTML plus plain text.
+     *
+     * Moodle text filters are applied unless skipfilters is set in $params.
      *
      * @param \stdClass $cm Course module record
      * @param \stdClass $instance Module instance
      * @param string $field Column name
      * @param string $modname Module name
+     * @param array $params Decoded rule parameters
      * @return array{0: string, 1: string} Formatted HTML and plain text
      */
-    protected function format_field(\stdClass $cm, \stdClass $instance, string $field, string $modname): array {
+    protected function format_field(
+        \stdClass $cm,
+        \stdClass $instance,
+        string $field,
+        string $modname,
+        array $params = []
+    ): array {
         $raw = (string) ($instance->$field ?? '');
         $formatfield = $field . 'format';
         $format = isset($instance->$formatfield) ? (int) $instance->$formatfield : FORMAT_HTML;
@@ -214,7 +223,7 @@ abstract class cm_field_rule extends base {
         );
         $html = format_text($rewritten, $format, [
             'context' => $context,
-            'filter' => true,
+            'filter' => empty($params['skipfilters']),
         ]);
         $text = html_to_text($html, 75, false);
         return [$html, $text];
@@ -294,5 +303,7 @@ abstract class cm_field_rule extends base {
             $mform->setDefault('matchmode', self::MATCH_LITERAL);
             $mform->addHelpButton('matchmode', 'rulematchmode', 'local_bbcotodobien');
         }
+
+        $this->add_skipfilters_element($mform);
     }
 }

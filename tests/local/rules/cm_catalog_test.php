@@ -187,6 +187,38 @@ final class cm_catalog_test extends \advanced_testcase {
     }
 
     /**
+     * skipfilters searches stored content that Moodle text filters would remove.
+     */
+    public function test_content_contains_skipfilters_bypasses_multilang(): void {
+        global $CFG;
+        require_once($CFG->libdir . '/filterlib.php');
+
+        $this->resetAfterTest();
+        filter_set_global_state('multilang', TEXTFILTER_ON);
+        \filter_manager::reset_caches();
+
+        $course = $this->getDataGenerator()->create_course();
+        $this->create_page(
+            $course,
+            'GUIDE',
+            '<p><span lang="en" class="multilang">Welcome</span>'
+                . '<span lang="xx" class="multilang">UNIQUEHIDDENTOKEN</span></p>'
+        );
+        $rule = new cm_content_contains();
+        $base = $this->content_params('GUIDE', 'UNIQUEHIDDENTOKEN');
+
+        $filtered = $rule->evaluate($course, $base);
+        $this->assertSame(result::STATUS_FAIL, $filtered->status);
+
+        $filteredexplicit = $rule->evaluate($course, $base + ['skipfilters' => 0]);
+        $this->assertSame(result::STATUS_FAIL, $filteredexplicit->status);
+
+        $unfiltered = $rule->evaluate($course, $base + ['skipfilters' => 1]);
+        $this->assertSame(result::STATUS_PASS, $unfiltered->status);
+        $this->assertSame(100.0, $unfiltered->compliance);
+    }
+
+    /**
      * RF-R02 passes when the pattern is absent.
      */
     public function test_content_excludes_pass_and_fail(): void {

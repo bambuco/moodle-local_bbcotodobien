@@ -50,7 +50,7 @@ class cm_html_selector extends cm_field_rule {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['modname', 'idnumber', 'field', 'cssclass', 'pattern', 'matchmode'];
+        return ['modname', 'idnumber', 'field', 'cssclass', 'pattern', 'matchmode', 'skipfilters'];
     }
 
     /**

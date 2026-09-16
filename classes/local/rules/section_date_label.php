@@ -60,7 +60,7 @@ class section_date_label extends base {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['datelabel', 'excludesections'];
+        return ['datelabel', 'excludesections', 'skipfilters'];
     }
 
     /**
@@ -83,6 +83,7 @@ class section_date_label extends base {
         $mform->addHelpButton('datelabel', 'ruledatelabel', 'local_bbcotodobien');
         $mform->addRule('datelabel', get_string('required'), 'required', null, 'client');
         section_helper::add_exclude_element($mform);
+        $this->add_skipfilters_element($mform);
     }
 
     /**
@@ -116,9 +117,10 @@ class section_date_label extends base {
         }
 
         $context = \context_course::instance((int) $course->id);
+        $applyfilters = empty($params['skipfilters']);
         $details = [];
         foreach ($sections as $section) {
-            $details[] = $this->evaluate_section($course, $section, $label, $context);
+            $details[] = $this->evaluate_section($course, $section, $label, $context, $applyfilters);
         }
         return $this->result_from_details($details);
     }
@@ -130,13 +132,15 @@ class section_date_label extends base {
      * @param \section_info $section Section info
      * @param string $label Literal label
      * @param \context_course $context Course context
+     * @param bool $applyfilters Whether to apply Moodle text filters
      * @return detail
      */
     protected function evaluate_section(
         \stdClass $course,
         \section_info $section,
         string $label,
-        \context_course $context
+        \context_course $context,
+        bool $applyfilters = true
     ): detail {
         $name = get_section_name($course, $section);
         $summary = \file_rewrite_pluginfile_urls(
@@ -149,7 +153,7 @@ class section_date_label extends base {
         );
         $html = format_text($summary, (int) $section->summaryformat, [
             'context' => $context,
-            'filter' => true,
+            'filter' => $applyfilters,
         ]);
         $text = html_to_text($html, 75, false);
         $pos = mb_stripos($text, $label, 0, 'UTF-8');

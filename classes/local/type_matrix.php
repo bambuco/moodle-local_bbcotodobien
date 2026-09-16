@@ -297,8 +297,8 @@ class type_matrix {
     /**
      * Align a keyed row to the column order expected by dataformat.
      *
-     * @param array<string, string> $columns Column map
-     * @param array<string, mixed> $row Keyed values
+     * @param array $columns Column map
+     * @param array $row Keyed values
      * @return array
      */
     protected static function order_row(array $columns, array $row): array {

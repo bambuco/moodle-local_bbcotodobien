@@ -50,7 +50,7 @@ class cm_content_excludes extends cm_field_rule {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['modname', 'idnumber', 'field', 'pattern', 'matchmode'];
+        return ['modname', 'idnumber', 'field', 'pattern', 'matchmode', 'skipfilters'];
     }
 
     /**

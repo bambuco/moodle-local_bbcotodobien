@@ -117,6 +117,17 @@ abstract class base {
     abstract public function add_config_form_elements($mform): void;
 
     /**
+     * Add the shared "comply without applying filters" checkbox.
+     *
+     * @param \MoodleQuickForm $mform Form to extend
+     */
+    protected function add_skipfilters_element($mform): void {
+        $mform->addElement('advcheckbox', 'skipfilters', get_string('ruleskipfilters', 'local_bbcotodobien'));
+        $mform->setDefault('skipfilters', 0);
+        $mform->addHelpButton('skipfilters', 'ruleskipfilters', 'local_bbcotodobien');
+    }
+
+    /**
      * Evaluate the rule against a course.
      *
      * @param \stdClass $course Course record

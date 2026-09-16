@@ -190,6 +190,35 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
     }
 
     /**
+     * skipfilters keeps multilang markup so a label in a hidden language still matches.
+     */
+    public function test_section_date_label_skipfilters_bypasses_multilang(): void {
+        global $CFG;
+        require_once($CFG->libdir . '/filterlib.php');
+
+        $this->resetAfterTest();
+        filter_set_global_state('multilang', TEXTFILTER_ON);
+        \filter_manager::reset_caches();
+
+        $course = $this->create_course_with_sections(1);
+        $this->set_section_summary(
+            $course,
+            1,
+            '<p><span lang="en" class="multilang">Hello</span>'
+                . '<span lang="xx" class="multilang">Start: 15 March 2026</span></p>'
+        );
+        $rule = new section_date_label();
+
+        $filtered = $rule->evaluate($course, ['datelabel' => 'Start:']);
+        $this->assertSame(result::STATUS_FAIL, $filtered->status);
+        $this->assertSame('rulesectiondatelabel_fail_nolabel', $filtered->details[0]->fields['identifier']);
+
+        $unfiltered = $rule->evaluate($course, ['datelabel' => 'Start:', 'skipfilters' => 1]);
+        $this->assertSame(result::STATUS_PASS, $unfiltered->status);
+        $this->assertSame(result::STATUS_PASS, $unfiltered->details[0]->status);
+    }
+
+    /**
      * Courses with only section 0 are not applicable.
      */
     public function test_section_rules_are_na_without_numbered_sections(): void {
