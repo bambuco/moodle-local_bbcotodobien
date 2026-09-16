@@ -91,6 +91,9 @@ function local_bbcotodobien_output_fragment_rule_detail(array $args): string {
 /**
  * Serve files from the plugin file areas.
  *
+ * Files "guidance" are not private and they are served without special capabilities.
+ * Files "snapshots" from global context are served with the site:config capability.
+ *
  * @param stdClass $course the course object
  * @param stdClass $cm the course module object
  * @param context $context the context
@@ -101,16 +104,17 @@ function local_bbcotodobien_output_fragment_rule_detail(array $args): string {
  * @return bool false if the file cannot be found, just send the file otherwise and do not return
  */
 function local_bbcotodobien_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
-    if ($context->contextlevel != CONTEXT_SYSTEM) {
-        return false;
-    }
-
-    require_login();
-
     $snapshotsarea = \local_bbcotodobien\local\type_matrix_file::FILEAREA;
     if ($filearea !== 'guidance' && $filearea !== $snapshotsarea) {
         return false;
     }
+
+    if ($context->contextlevel !== CONTEXT_SYSTEM) {
+        return false;
+    }
+
+    require_login(null, false);
+
     if ($filearea === $snapshotsarea) {
         require_capability('moodle/site:config', $context);
     }
@@ -136,5 +140,5 @@ function local_bbcotodobien_pluginfile($course, $cm, $context, $filearea, $args,
         return false;
     }
 
-    send_stored_file($file, 0, 0, $forcedownload, $options);
+    send_stored_file($file, 0, 0, 1, $options);
 }

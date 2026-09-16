@@ -36,6 +36,7 @@ $capabilities = [
     ],
     'local/bbcotodobien:viewreport' => [
         'captype' => 'read',
+        'riskbitmask' => RISK_PERSONAL,
         'contextlevel' => CONTEXT_COURSE,
         'archetypes' => [
             'editingteacher' => CAP_ALLOW,

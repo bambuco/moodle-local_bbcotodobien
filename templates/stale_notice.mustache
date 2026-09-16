@@ -15,20 +15,16 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template local_bbcotodobien/header_alert
+    @template local_bbcotodobien/stale_notice
 
-    Course header alert when compliance is below 100%.
+    Notice shown when a rule status change may have updated the type heading.
 
-    Example context (json):
-    {
-        "percent": "0.00",
-        "courseurl": "/local/bbcotodobien/view.php?id=2",
-        "coursename": "Course 1",
-        "level": "warning"
-    }
+    Example context (json): {}
 }}
-<div class="local-bbcotodobien-headeralert alert alert-{{level}}" role="alert">
-    <span>{{#str}} headeralertmessage, local_bbcotodobien, {{percent}} {{/str}}</span>
-    <a class="alert-link ms-2" href="{{courseurl}}">{{#str}} currentreport, local_bbcotodobien {{/str}}</a>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+<div class="local-bbcotodobien-stale-notice flex-wrap align-items-center gap-2" data-region="stalenotice" hidden
+     role="status">
+    <span class="small text-muted">{{#str}} reportvaluemayhavechanged, local_bbcotodobien {{/str}}</span>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="reloadreport">
+        {{#str}} reloadforupdatedinfo, local_bbcotodobien {{/str}}
+    </button>
 </div>

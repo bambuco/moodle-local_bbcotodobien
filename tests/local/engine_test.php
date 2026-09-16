@@ -238,6 +238,7 @@ final class engine_test extends \advanced_testcase {
         ]);
 
         $audit = engine::run_audit($course->id, $typeid, 0);
+        $this->assertDebuggingCalled();
         $latest = writer::get_latest_rule_result((int) $audit->id, $configid);
 
         $this->assertSame(result::STATUS_ERROR, $audit->status);

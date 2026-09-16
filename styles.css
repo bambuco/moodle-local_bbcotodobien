@@ -16,9 +16,23 @@
     z-index: 999;
 }
 
-.local-bbcotodobien-current .accordion-button img,
-.local-bbcotodobien-current td img {
-    margin-right: 0.25rem;
+.local-bbcotodobien-current {
+    .accordion-button img,
+    td img {
+        margin-right: 0.25rem;
+    }
+}
+
+.local-bbcotodobien-typepanel .accordion-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+
+    .accordion-button {
+        flex: 1 1 auto;
+        width: auto;
+    }
 }
 
 .local-bbcotodobien-guidance {
