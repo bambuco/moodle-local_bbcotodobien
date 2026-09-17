@@ -85,6 +85,52 @@ class section_helper {
     }
 
     /**
+     * Keep sections whose visible name matches the optional regular expression.
+     *
+     * An empty pattern leaves the list unchanged. An invalid regular expression
+     * returns null so the caller can report a configuration error.
+     *
+     * @param \stdClass $course Course record
+     * @param \section_info[] $sections Sections keyed by number
+     * @param string $pattern PHP regex without delimiters
+     * @return \section_info[]|null
+     */
+    public static function filter_sections_by_name(\stdClass $course, array $sections, string $pattern): ?array {
+        $pattern = trim($pattern);
+        if ($pattern === '') {
+            return $sections;
+        }
+        if (self::name_matches_regex('', $pattern) === null) {
+            return null;
+        }
+
+        $filtered = [];
+        foreach ($sections as $number => $section) {
+            $name = get_section_name($course, $section);
+            if (self::name_matches_regex($name, $pattern)) {
+                $filtered[$number] = $section;
+            }
+        }
+        return $filtered;
+    }
+
+    /**
+     * Whether a section name matches a PHP regular expression without delimiters.
+     *
+     * @param string $name Visible section name
+     * @param string $pattern PHP regex without delimiters
+     * @return bool|null True/false, or null when the regular expression is invalid
+     */
+    public static function name_matches_regex(string $name, string $pattern): ?bool {
+        $delimited = '/' . str_replace('/', '\/', $pattern) . '/u';
+        $result = @preg_match($delimited, $name);
+        if ($result === false) {
+            return null;
+        }
+        return $result === 1;
+    }
+
+    /**
      * Add the shared excluded-sections field to a form.
      *
      * @param \MoodleQuickForm $mform Form to extend
@@ -113,5 +159,21 @@ class section_helper {
         );
         $mform->setDefault('includehiddensections', 0);
         $mform->addHelpButton('includehiddensections', 'ruleincludehiddensections', 'local_bbcotodobien');
+    }
+
+    /**
+     * Add the optional section-name regular expression field to a form.
+     *
+     * @param \MoodleQuickForm $mform Form to extend
+     */
+    public static function add_sectionnameregex_element($mform): void {
+        $mform->addElement(
+            'text',
+            'sectionnameregex',
+            get_string('rulesectionnameregex', 'local_bbcotodobien'),
+            ['size' => 40]
+        );
+        $mform->setType('sectionnameregex', PARAM_RAW);
+        $mform->addHelpButton('sectionnameregex', 'rulesectionnameregex', 'local_bbcotodobien');
     }
 }

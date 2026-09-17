@@ -60,7 +60,7 @@ class section_date_label extends base {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['datelabel', 'excludesections', 'includehiddensections', 'skipfilters'];
+        return ['datelabel', 'excludesections', 'includehiddensections', 'sectionnameregex', 'skipfilters'];
     }
 
     /**
@@ -84,6 +84,7 @@ class section_date_label extends base {
         $mform->addRule('datelabel', get_string('required'), 'required', null, 'client');
         section_helper::add_exclude_element($mform);
         section_helper::add_includehiddensections_element($mform);
+        section_helper::add_sectionnameregex_element($mform);
         $this->add_skipfilters_element($mform);
     }
 
@@ -117,6 +118,22 @@ class section_date_label extends base {
             $excluded,
             !empty($params['includehiddensections'])
         );
+        $sections = section_helper::filter_sections_by_name(
+            $course,
+            $sections,
+            (string) ($params['sectionnameregex'] ?? '')
+        );
+        if ($sections === null) {
+            return $this->result_from_details([
+                $this->make_detail(
+                    self::GRANULARITY_COURSE,
+                    (int) $course->id,
+                    $course->fullname ?? '',
+                    self::STATUS_ERROR,
+                    'ruleinvalidregex'
+                ),
+            ]);
+        }
         if (!$sections) {
             return $this->result_from_details([]);
         }
@@ -161,6 +178,9 @@ class section_date_label extends base {
             'filter' => $applyfilters,
         ]);
         $text = html_to_text($html, 75, false);
+        // Replace new lines and non-breaking space with regular space.
+        $text = str_replace(["\r\n", "\n", "\r", "\u{00A0}"], ' ', $text);
+
         $pos = mb_stripos($text, $label, 0, 'UTF-8');
         if ($pos === false) {
             return $this->make_detail(
@@ -207,6 +227,7 @@ class section_date_label extends base {
         $label = $detail->fields['label'] ?? '';
         return match ($identifier) {
             'rulemissingparams' => get_string('rulemissingparams', 'local_bbcotodobien'),
+            'ruleinvalidregex' => get_string('ruleinvalidregex', 'local_bbcotodobien'),
             'rulesectiondatelabel_fail_nolabel' => get_string(
                 'rulesectiondatelabel_fail_nolabel',
                 'local_bbcotodobien',
@@ -223,7 +244,7 @@ class section_date_label extends base {
     }
 
     /**
-     * Whether the text starts with a strtotime()-parseable date that includes a digit.
+     * Whether the text starts with a parseable date that includes a digit.
      *
      * @param string $line Remaining summary text
      * @return bool
@@ -237,10 +258,42 @@ class section_date_label extends base {
         foreach ($parts as $part) {
             $candidate = trim($candidate . ' ' . $part);
             $try = rtrim($candidate, '.,;:');
-            if ($try !== '' && preg_match('/\d/', $try) && strtotime($try) !== false) {
+            if ($this->is_parseable_date($try)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Whether the candidate is a date accepted by strtotime() or extra hardcoded formats.
+     *
+     * Extra formats currently include d/m/yyyy (1 or 2 digit day/month). Slash dates that
+     * strtotime() already accepts as m/d/yyyy remain valid.
+     *
+     * @param string $try Date candidate
+     * @return bool
+     */
+    protected function is_parseable_date(string $try): bool {
+        if ($try === '' || !preg_match('/\d/', $try)) {
+            return false;
+        }
+        if (strtotime($try) !== false) {
+            return true;
+        }
+        return $this->matches_dmy_slash_date($try);
+    }
+
+    /**
+     * Whether the candidate is a valid calendar date in d/m/yyyy form.
+     *
+     * @param string $try Date candidate
+     * @return bool
+     */
+    protected function matches_dmy_slash_date(string $try): bool {
+        if (!preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $try, $matches)) {
+            return false;
+        }
+        return checkdate((int) $matches[2], (int) $matches[1], (int) $matches[3]);
     }
 }

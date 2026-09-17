@@ -60,7 +60,7 @@ class section_activity_dates extends base {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['excludesections', 'includehiddensections'];
+        return ['excludesections', 'includehiddensections', 'sectionnameregex'];
     }
 
     /**
@@ -71,6 +71,7 @@ class section_activity_dates extends base {
     public function add_config_form_elements($mform): void {
         section_helper::add_exclude_element($mform);
         section_helper::add_includehiddensections_element($mform);
+        section_helper::add_sectionnameregex_element($mform);
     }
 
     /**
@@ -87,6 +88,22 @@ class section_activity_dates extends base {
             $excluded,
             !empty($params['includehiddensections'])
         );
+        $sections = section_helper::filter_sections_by_name(
+            $course,
+            $sections,
+            (string) ($params['sectionnameregex'] ?? '')
+        );
+        if ($sections === null) {
+            return $this->result_from_details([
+                $this->make_detail(
+                    self::GRANULARITY_COURSE,
+                    (int) $course->id,
+                    $course->fullname ?? '',
+                    self::STATUS_ERROR,
+                    'ruleinvalidregex'
+                ),
+            ]);
+        }
         if (!$sections) {
             return $this->result_from_details([]);
         }
@@ -164,6 +181,7 @@ class section_activity_dates extends base {
     public function render_detail(detail $detail): string {
         $identifier = $detail->fields['identifier'] ?? '';
         return match ($identifier) {
+            'ruleinvalidregex' => get_string('ruleinvalidregex', 'local_bbcotodobien'),
             'ruleactivitydates_na' => get_string('ruleactivitydates_na', 'local_bbcotodobien'),
             'ruleactivitydates_pass' => get_string('ruleactivitydates_pass', 'local_bbcotodobien'),
             'ruleactivitydates_fail' => get_string('ruleactivitydates_fail', 'local_bbcotodobien'),

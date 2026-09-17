@@ -56,6 +56,19 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
     }
 
     /**
+     * Set a custom section name.
+     *
+     * @param \stdClass $course Course
+     * @param int $sectionnum Section number
+     * @param string $name Section name
+     */
+    private function set_section_name(\stdClass $course, int $sectionnum, string $name): void {
+        $section = get_fast_modinfo($course)->get_section_info($sectionnum);
+        course_update_section($course, $section, ['name' => $name]);
+        rebuild_course_cache($course->id, true);
+    }
+
+    /**
      * Set a section summary.
      *
      * @param \stdClass $course Course
@@ -168,6 +181,33 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
     }
 
     /**
+     * Slash dates in d/m/yyyy form pass; US m/d/yyyy still passes; invalid calendar dates fail.
+     */
+    public function test_section_date_label_accepts_dmy_slash_dates(): void {
+        $this->resetAfterTest();
+        $course = $this->create_course_with_sections(1);
+        $rule = new section_date_label();
+
+        $this->set_section_summary(
+            $course,
+            1,
+            '<p>Fecha de Inicio: 14/09/2026 Fecha de Finalización: 15/09/2026</p>'
+        );
+        $dmy = $rule->evaluate($course, ['datelabel' => 'Fecha de Inicio:', 'excludesections' => '0']);
+        $this->assertSame(result::STATUS_PASS, $dmy->status);
+        $this->assertSame(result::STATUS_PASS, $dmy->details[0]->status);
+
+        $this->set_section_summary($course, 1, '<p>Start: 10/14/2026</p>');
+        $mdy = $rule->evaluate($course, ['datelabel' => 'Start:', 'excludesections' => '0']);
+        $this->assertSame(result::STATUS_PASS, $mdy->status);
+
+        $this->set_section_summary($course, 1, '<p>Start: 31/02/2026</p>');
+        $invalid = $rule->evaluate($course, ['datelabel' => 'Start:', 'excludesections' => '0']);
+        $this->assertSame(result::STATUS_FAIL, $invalid->status);
+        $this->assertSame('rulesectiondatelabel_fail_nodate', $invalid->details[0]->fields['identifier']);
+    }
+
+    /**
      * Embedded @@PLUGINFILE@@ tokens in the summary must be rewritten before format_text().
      */
     public function test_section_date_label_rewrites_pluginfile_urls(): void {
@@ -245,6 +285,41 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
         $withhidden = $rule->evaluate($course, $base + ['includehiddensections' => 1]);
         $this->assertCount(2, $withhidden->details);
         $this->assertSame(result::STATUS_PASS, $withhidden->status);
+    }
+
+    /**
+     * A section name regex includes matching sections and skips the rest.
+     */
+    public function test_section_date_label_sectionnameregex(): void {
+        $this->resetAfterTest();
+        $course = $this->create_course_with_sections(2);
+        $this->set_section_name($course, 1, 'Unidad 1');
+        $this->set_section_name($course, 2, 'Introducción');
+        $this->set_section_summary($course, 1, '<p>Start: 15 March 2026</p>');
+        $this->set_section_summary($course, 2, '<p>Missing</p>');
+        $rule = new section_date_label();
+        $base = ['datelabel' => 'Start:', 'excludesections' => '0'];
+
+        $filtered = $rule->evaluate($course, $base + ['sectionnameregex' => '^Unidad']);
+        $this->assertCount(1, $filtered->details);
+        $this->assertSame(result::STATUS_PASS, $filtered->status);
+        $this->assertSame('Unidad 1', $filtered->details[0]->targetname);
+
+        $unfiltered = $rule->evaluate($course, $base);
+        $this->assertCount(2, $unfiltered->details);
+        $this->assertSame(result::STATUS_FAIL, $unfiltered->status);
+
+        $empty = $rule->evaluate($course, $base + ['sectionnameregex' => '   ']);
+        $this->assertCount(2, $empty->details);
+        $this->assertSame(result::STATUS_FAIL, $empty->status);
+
+        $invalid = $rule->evaluate($course, $base + ['sectionnameregex' => '(']);
+        $this->assertSame(result::STATUS_ERROR, $invalid->status);
+        $this->assertSame('ruleinvalidregex', $invalid->details[0]->fields['identifier']);
+        $this->assertSame(
+            get_string('ruleinvalidregex', 'local_bbcotodobien'),
+            $rule->render_detail($invalid->details[0])
+        );
     }
 
     /**
@@ -387,6 +462,47 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
         ]);
         $this->assertCount(1, $withhidden->details);
         $this->assertSame(result::STATUS_FAIL, $withhidden->status);
+    }
+
+    /**
+     * Activities in sections whose name does not match the regex are skipped.
+     */
+    public function test_section_activity_dates_sectionnameregex(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->create_course_with_sections(2);
+        $this->set_section_name($course, 1, 'Unidad 1');
+        $this->set_section_name($course, 2, 'Introducción');
+        $this->getDataGenerator()->create_module('assign', [
+            'course' => $course->id,
+            'section' => 1,
+            'allowsubmissionsfromdate' => 0,
+            'duedate' => 0,
+        ]);
+        $this->getDataGenerator()->create_module('assign', [
+            'course' => $course->id,
+            'section' => 2,
+            'allowsubmissionsfromdate' => 0,
+            'duedate' => 0,
+        ]);
+
+        $filtered = (new section_activity_dates())->evaluate($course, [
+            'excludesections' => '0',
+            'sectionnameregex' => '^Unidad',
+        ]);
+        $this->assertCount(1, $filtered->details);
+        $this->assertSame(result::STATUS_FAIL, $filtered->status);
+
+        $unfiltered = (new section_activity_dates())->evaluate($course, ['excludesections' => '0']);
+        $this->assertCount(2, $unfiltered->details);
+        $this->assertSame(result::STATUS_FAIL, $unfiltered->status);
+
+        $invalid = (new section_activity_dates())->evaluate($course, [
+            'excludesections' => '0',
+            'sectionnameregex' => '(',
+        ]);
+        $this->assertSame(result::STATUS_ERROR, $invalid->status);
+        $this->assertSame('ruleinvalidregex', $invalid->details[0]->fields['identifier']);
     }
 
     /**
