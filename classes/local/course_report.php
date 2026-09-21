@@ -357,7 +357,7 @@ class course_report {
             if (!$category) {
                 return null;
             }
-            return new \moodle_url('/grade/report/grader/index.php', [
+            return new \moodle_url('/grade/edit/tree/index.php', [
                 'id' => (int) $course->id,
             ]);
         }
