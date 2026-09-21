@@ -429,9 +429,8 @@ final class course_report_test extends \advanced_testcase {
         $this->assertCount(1, $data['details'][0]['failinggroups'][0]['items']);
         $link = $data['details'][0]['failinggroups'][0]['items'][0];
         $this->assertTrue($link['hasurl']);
-        $this->assertStringContainsString('grade/edit/tree/category.php', $link['url']);
-        $this->assertStringContainsString('courseid=' . $course->id, $link['url']);
-        $this->assertStringContainsString('id=' . $category->id, $link['url']);
+        $this->assertStringContainsString('grade/report/grader/index.php', $link['url']);
+        $this->assertStringContainsString('id=' . $course->id, $link['url']);
     }
 
     /**
