@@ -412,9 +412,9 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
         $this->assertCount(3, $result->details);
         $statuses = array_map(static fn($detail) => $detail->status, $result->details);
         $this->assertContains(result::STATUS_PASS, $statuses);
-        $this->assertContains(result::STATUS_FAIL, $statuses);
-        $this->assertContains(result::STATUS_NA, $statuses);
-        $this->assertSame(50.0, $result->compliance);
+        $this->assertSame(2, count(array_filter($statuses, static fn($status) => $status === result::STATUS_FAIL)));
+        $this->assertNotContains(result::STATUS_NA, $statuses);
+        $this->assertSame(33.33, $result->compliance);
         $this->assertSame(result::STATUS_FAIL, $result->status);
     }
 
@@ -503,6 +503,86 @@ final class section_gradebook_catalog_test extends \advanced_testcase {
         ]);
         $this->assertSame(result::STATUS_ERROR, $invalid->status);
         $this->assertSame('ruleinvalidregex', $invalid->details[0]->fields['identifier']);
+    }
+
+    /**
+     * Optional grade category idnumbers limit which activities are evaluated.
+     */
+    public function test_section_activity_dates_gradecategoryidnumbers(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->create_course_with_sections(1);
+        $start = time() - DAYSECS;
+        $end = time() + DAYSECS;
+
+        $infilter = $this->getDataGenerator()->create_module('assign', [
+            'course' => $course->id,
+            'section' => 1,
+            'allowsubmissionsfromdate' => $start,
+            'duedate' => $end,
+        ]);
+        $othercat = $this->getDataGenerator()->create_module('assign', [
+            'course' => $course->id,
+            'section' => 1,
+            'allowsubmissionsfromdate' => 0,
+            'duedate' => 0,
+        ]);
+        $uncategorised = $this->getDataGenerator()->create_module('assign', [
+            'course' => $course->id,
+            'section' => 1,
+            'allowsubmissionsfromdate' => 0,
+            'duedate' => 0,
+        ]);
+        $second = $this->getDataGenerator()->create_module('assign', [
+            'course' => $course->id,
+            'section' => 1,
+            'allowsubmissionsfromdate' => $start,
+            'duedate' => $end,
+        ]);
+
+        $catone = $this->create_category_with_idnumber($course, 'CAT1');
+        $cattwo = $this->create_category_with_idnumber($course, 'CAT2');
+        $this->place_assign_in_category($infilter, (int) $course->id, (int) $catone->id, 1.0);
+        $this->place_assign_in_category($othercat, (int) $course->id, (int) $cattwo->id, 1.0);
+        $this->place_assign_in_category($second, (int) $course->id, (int) $cattwo->id, 1.0);
+
+        $modinfo = get_fast_modinfo($course);
+        $infiltercmid = (int) $modinfo->instances['assign'][$infilter->id]->id;
+        $secondcmid = (int) $modinfo->instances['assign'][$second->id]->id;
+
+        $unfiltered = (new section_activity_dates())->evaluate($course, [
+            'excludesections' => '0',
+            'gradecategoryidnumbers' => '',
+        ]);
+        $this->assertCount(4, $unfiltered->details);
+
+        $filtered = (new section_activity_dates())->evaluate($course, [
+            'excludesections' => '0',
+            'gradecategoryidnumbers' => 'CAT1',
+        ]);
+        $this->assertCount(1, $filtered->details);
+        $this->assertSame($infiltercmid, (int) $filtered->details[0]->targetid);
+        $this->assertSame(result::STATUS_PASS, $filtered->status);
+
+        $multi = (new section_activity_dates())->evaluate($course, [
+            'excludesections' => '0',
+            'gradecategoryidnumbers' => 'CAT1, CAT2',
+        ]);
+        $this->assertCount(3, $multi->details);
+        $ids = array_map(static fn($detail) => (int) $detail->targetid, $multi->details);
+        $this->assertContains($infiltercmid, $ids);
+        $this->assertContains($secondcmid, $ids);
+        $this->assertNotContains(
+            (int) $modinfo->instances['assign'][$uncategorised->id]->id,
+            $ids
+        );
+
+        $missing = (new section_activity_dates())->evaluate($course, [
+            'excludesections' => '0',
+            'gradecategoryidnumbers' => 'DOESNOTEXIST',
+        ]);
+        $this->assertSame(result::STATUS_NA, $missing->status);
+        $this->assertSame([], $missing->details);
     }
 
     /**

@@ -14,6 +14,9 @@ Download zip package, extract the bbcotodobien folder and upload this folder int
 
 ## IN VERSION
 
+### 2026091602:
+* New gradecategoryidnumbers field for activities start/end dates.
+
 ### 2026091404:
 * Audit types scoped by course category (empty = whole site; parent categories include descendants).
 * Rule catalogue RF-R01 to RF-R08:

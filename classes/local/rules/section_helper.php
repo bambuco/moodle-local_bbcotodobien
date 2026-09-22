@@ -176,4 +176,90 @@ class section_helper {
         $mform->setType('sectionnameregex', PARAM_RAW);
         $mform->addHelpButton('sectionnameregex', 'rulesectionnameregex', 'local_bbcotodobien');
     }
+
+    /**
+     * Parse grade category idnumbers from a CSV param.
+     *
+     * Empty tokens are ignored. Duplicates are removed while preserving order.
+     *
+     * @param array|string $value Raw param
+     * @return string[]
+     */
+    public static function parse_idnumbers(array|string $value): array {
+        if (is_array($value)) {
+            $parts = $value;
+        } else {
+            $parts = explode(',', $value);
+        }
+        $idnumbers = [];
+        foreach ($parts as $part) {
+            $token = trim((string) $part);
+            if ($token === '') {
+                continue;
+            }
+            $idnumbers[$token] = $token;
+        }
+        return array_values($idnumbers);
+    }
+
+    /**
+     * Add the optional grade-category idnumbers filter field to a form.
+     *
+     * @param \MoodleQuickForm $mform Form to extend
+     */
+    public static function add_gradecategoryidnumbers_element($mform): void {
+        $mform->addElement(
+            'text',
+            'gradecategoryidnumbers',
+            get_string('rulegradecategoryidnumbers', 'local_bbcotodobien'),
+            ['size' => 40]
+        );
+        $mform->setType('gradecategoryidnumbers', PARAM_TEXT);
+        $mform->addHelpButton('gradecategoryidnumbers', 'rulegradecategoryidnumbers', 'local_bbcotodobien');
+    }
+
+    /**
+     * Return course-module ids whose mod grade items sit directly in the given categories.
+     *
+     * Categories are identified by the idnumber stored on their category grade item.
+     * An empty $idnumbers list returns an empty array.
+     *
+     * @param int $courseid Course id
+     * @param string[] $idnumbers Grade category idnumbers
+     * @return int[]
+     */
+    public static function get_cmids_in_grade_categories(int $courseid, array $idnumbers): array {
+        global $DB;
+
+        if (!$idnumbers) {
+            return [];
+        }
+
+        [$insql, $params] = $DB->get_in_or_equal($idnumbers, SQL_PARAMS_NAMED, 'idn');
+        $params['courseid'] = $courseid;
+
+        $sql = "SELECT gi.id, gi.itemmodule, gi.iteminstance
+                  FROM {grade_items} gi
+                  JOIN {grade_items} catitem
+                    ON catitem.itemtype = 'category'
+                   AND catitem.iteminstance = gi.categoryid
+                   AND catitem.courseid = gi.courseid
+                 WHERE gi.courseid = :courseid
+                   AND gi.itemtype = 'mod'
+                   AND catitem.idnumber {$insql}";
+        $items = $DB->get_records_sql($sql, $params);
+        if (!$items) {
+            return [];
+        }
+
+        $modinfo = get_fast_modinfo($courseid);
+        $cmids = [];
+        foreach ($items as $item) {
+            $cm = $modinfo->instances[$item->itemmodule][$item->iteminstance] ?? null;
+            if ($cm) {
+                $cmids[(int) $cm->id] = (int) $cm->id;
+            }
+        }
+        return array_values($cmids);
+    }
 }

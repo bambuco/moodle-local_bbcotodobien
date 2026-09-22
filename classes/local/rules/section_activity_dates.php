@@ -60,7 +60,7 @@ class section_activity_dates extends base {
      * @return string[]
      */
     public function get_config_param_names(): array {
-        return ['excludesections', 'includehiddensections', 'sectionnameregex'];
+        return ['excludesections', 'includehiddensections', 'sectionnameregex', 'gradecategoryidnumbers'];
     }
 
     /**
@@ -72,6 +72,7 @@ class section_activity_dates extends base {
         section_helper::add_exclude_element($mform);
         section_helper::add_includehiddensections_element($mform);
         section_helper::add_sectionnameregex_element($mform);
+        section_helper::add_gradecategoryidnumbers_element($mform);
     }
 
     /**
@@ -108,12 +109,24 @@ class section_activity_dates extends base {
             return $this->result_from_details([]);
         }
 
+        $categoryidnumbers = section_helper::parse_idnumbers($params['gradecategoryidnumbers'] ?? '');
+        $allowedcmids = null;
+        if ($categoryidnumbers) {
+            $allowedcmids = array_fill_keys(
+                section_helper::get_cmids_in_grade_categories((int) $course->id, $categoryidnumbers),
+                true
+            );
+        }
+
         $modinfo = get_fast_modinfo($course);
         $details = [];
         foreach ($sections as $section) {
             $cmids = $modinfo->get_sections()[(int) $section->sectionnum] ?? [];
             foreach ($cmids as $cmid) {
                 if (!isset($modinfo->cms[$cmid])) {
+                    continue;
+                }
+                if ($allowedcmids !== null && !isset($allowedcmids[(int) $cmid])) {
                     continue;
                 }
                 $cm = $modinfo->cms[$cmid];
@@ -138,22 +151,14 @@ class section_activity_dates extends base {
      */
     protected function evaluate_cm(\cm_info $cm): ?detail {
         $slots = $this->get_date_slots($cm);
-        if ($slots === null || count($slots) < 2) {
+        if ($slots === null) {
             return null;
         }
 
-        $set = array_filter($slots, static fn(int $value): bool => $value > 0);
+        $hasstart = (bool) array_filter($slots['start'], static fn(int $value): bool => $value > 0);
+        $hasend = (bool) array_filter($slots['end'], static fn(int $value): bool => $value > 0);
         $name = $cm->get_formatted_name();
-        if (count($set) === 1) {
-            return $this->make_detail(
-                self::GRANULARITY_CM,
-                (int) $cm->id,
-                $name,
-                self::STATUS_NA,
-                'ruleactivitydates_na'
-            );
-        }
-        if (count($set) >= 2) {
+        if ($hasstart && $hasend) {
             return $this->make_detail(
                 self::GRANULARITY_CM,
                 (int) $cm->id,
@@ -182,7 +187,6 @@ class section_activity_dates extends base {
         $identifier = $detail->fields['identifier'] ?? '';
         return match ($identifier) {
             'ruleinvalidregex' => get_string('ruleinvalidregex', 'local_bbcotodobien'),
-            'ruleactivitydates_na' => get_string('ruleactivitydates_na', 'local_bbcotodobien'),
             'ruleactivitydates_pass' => get_string('ruleactivitydates_pass', 'local_bbcotodobien'),
             'ruleactivitydates_fail' => get_string('ruleactivitydates_fail', 'local_bbcotodobien'),
             default => parent::render_detail($detail),
@@ -190,12 +194,12 @@ class section_activity_dates extends base {
     }
 
     /**
-     * Return native date slot timestamps, or null when the module has no start/end pair.
+     * Return native start/end date slots, or null when the module has no start/end pair.
      *
      * Moodle omits zero dates from cm customdata, so the instance table is the source of the pair.
      *
      * @param \cm_info $cm Course module
-     * @return int[]|null
+     * @return array{start: int[], end: int[]}|null
      */
     protected function get_date_slots(\cm_info $cm): ?array {
         global $DB;
@@ -213,9 +217,8 @@ class section_activity_dates extends base {
             return null;
         }
 
-        $slots = [];
-        $hasstart = false;
-        $hasend = false;
+        $start = [];
+        $end = [];
         foreach ((array) $instance as $key => $value) {
             if (is_array($value) || is_object($value) || is_bool($value)) {
                 continue;
@@ -235,14 +238,18 @@ class section_activity_dates extends base {
             if (!$isstart && !$isend) {
                 continue;
             }
-            $slots[$keyname] = (int) $value;
-            $hasstart = $hasstart || $isstart;
-            $hasend = $hasend || $isend;
+            $timestamp = (int) $value;
+            if ($isstart) {
+                $start[$keyname] = $timestamp;
+            }
+            if ($isend) {
+                $end[$keyname] = $timestamp;
+            }
         }
 
-        if (!$hasstart || !$hasend) {
+        if (!$start || !$end) {
             return null;
         }
-        return $slots;
+        return ['start' => $start, 'end' => $end];
     }
 }
