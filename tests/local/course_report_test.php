@@ -47,7 +47,7 @@ final class course_report_test extends \advanced_testcase {
     }
 
     /**
-     * Never-run applicable types are treated as 0% compliance.
+     * When no applicable type has been run, the header alert shows 0%.
      */
     public function test_header_alert_shown_when_never_run(): void {
         $this->resetAfterTest();
@@ -74,6 +74,48 @@ final class course_report_test extends \advanced_testcase {
         ]);
         engine::run_audit($course->id, $typeid, 0);
         $this->assertNull(course_report::get_header_alert($course));
+    }
+
+    /**
+     * Header alert averages latest reviews; never-run types and older audits are ignored.
+     */
+    public function test_header_alert_averages_latest_reviews(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+
+        $halftypeid = audit_type_manager::create_type('Half');
+        $halfruleid = audit_type_manager::create_rule_config($halftypeid, [
+            'ruleclass' => stub_rule::class,
+            'name' => get_string('stubrule', 'local_bbcotodobien'),
+            'mandatory' => true,
+            'params' => ['pass' => false],
+        ]);
+        engine::run_audit($course->id, $halftypeid, 0);
+        audit_type_manager::update_rule_config($halfruleid, [
+            'params' => [
+                'items' => [
+                    ['targetid' => 1, 'targetname' => 'S1', 'status' => result::STATUS_PASS],
+                    ['targetid' => 2, 'targetname' => 'S2', 'status' => result::STATUS_FAIL],
+                ],
+            ],
+        ]);
+        engine::run_audit($course->id, $halftypeid, 0);
+
+        $passtypeid = audit_type_manager::create_type('Pass');
+        audit_type_manager::create_rule_config($passtypeid, [
+            'ruleclass' => stub_rule::class,
+            'name' => get_string('stubrule', 'local_bbcotodobien'),
+            'mandatory' => true,
+            'params' => ['pass' => true],
+        ]);
+        engine::run_audit($course->id, $passtypeid, 0);
+
+        audit_type_manager::create_type('Never');
+
+        $alert = course_report::get_header_alert($course);
+        $this->assertNotNull($alert);
+        $this->assertSame(format_float(75, 2), $alert['percent']);
+        $this->assertSame('warning', $alert['level']);
     }
 
     /**

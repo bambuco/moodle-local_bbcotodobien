@@ -56,7 +56,9 @@ final class factory_test extends \advanced_testcase {
         $this->assertArrayHasKey(section_activity_dates::class, $menu);
         $this->assertArrayHasKey(grade_category_moditems::class, $menu);
         $this->assertArrayHasKey(grade_category_weights::class, $menu);
+        $this->assertArrayHasKey(cm_submissions_graded::class, $menu);
         $this->assertArrayHasKey('cm_content_contains', factory::get_rule_classes());
+        $this->assertArrayHasKey('cm_submissions_graded', factory::get_rule_classes());
     }
 
     /**

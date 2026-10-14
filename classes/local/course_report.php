@@ -59,6 +59,10 @@ class course_report {
     /**
      * Header alert payload, or null when nothing should be shown.
      *
+     * Uses the simple average of the latest compliance for each applicable audit
+     * type that has already been run. Types without a stored review are excluded.
+     * When no type has been run, the alert shows 0%.
+     *
      * @param \stdClass $course Course record
      * @return array|null
      */
@@ -68,22 +72,26 @@ class course_report {
             return null;
         }
 
-        $minimum = 100.0;
+        $values = [];
         foreach ($types as $type) {
             $audit = writer::get_latest_course_audit((int) $course->id, (int) $type->id);
-            $compliance = $audit ? (float) $audit->compliance : 0.0;
-            $minimum = min($minimum, $compliance);
+            if (!$audit) {
+                continue;
+            }
+            $values[] = (float) $audit->compliance;
         }
-        if ($minimum >= 100.0) {
+
+        $average = $values ? round(array_sum($values) / count($values), 2) : 0.0;
+        if ($average >= 100.0) {
             return null;
         }
 
         $url = new \moodle_url('/local/bbcotodobien/view.php', ['id' => $course->id]);
         return [
-            'percent' => format_float($minimum, 2),
+            'percent' => format_float($average, 2),
             'courseurl' => $url->out(false),
             'coursename' => format_string($course->fullname),
-            'level' => $minimum < 75.0 ? 'danger' : ($minimum < 90.0 ? 'warning' : 'success'),
+            'level' => $average < 75.0 ? 'danger' : ($average < 90.0 ? 'warning' : 'success'),
         ];
     }
 

@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $plugin->component    = 'local_bbcotodobien';
 $plugin->release      = '1.0';
-$plugin->version      = 2026092100;
+$plugin->version      = 2026101301;
 $plugin->requires     = 2025100600;
 $plugin->supported    = [501, 502];
 $plugin->maturity     = MATURITY_RC;

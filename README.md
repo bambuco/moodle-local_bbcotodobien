@@ -14,6 +14,10 @@ Download zip package, extract the bbcotodobien folder and upload this folder int
 
 ## IN VERSION
 
+### 2026101300:
+* New rule RF-R09: submissions graded / feedback coverage (assign, workshop, quiz with manual grading, forum whole-forum grading).
+* Configurable threshold, check mode (grade / feedback / both), feedback source (gradebook / activity / hybrid), and optional grade category filter.
+
 ### 2026091602:
 * New gradecategoryidnumbers field for activities start/end dates.
 

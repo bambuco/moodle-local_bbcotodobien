@@ -28,7 +28,7 @@ use local_bbcotodobien\local\course_report;
  */
 class hook_callbacks {
     /**
-     * Inject a course header alert when applicable audits are below 100%.
+     * Inject a course header alert when the average of latest audits is below 100%.
      *
      * @param before_standard_top_of_body_html_generation $hook Hook
      */
