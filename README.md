@@ -14,6 +14,9 @@ Download zip package, extract the bbcotodobien folder and upload this folder int
 
 ## IN VERSION
 
+### 2026101400:
+* RF-R04 applies to every forum type. A single simple discussion forum passes without checking the discussion author.
+
 ### 2026101300:
 * New rule RF-R09: submissions graded / feedback coverage (assign, workshop, quiz with manual grading, forum whole-forum grading).
 * Configurable threshold, check mode (grade / feedback / both), feedback source (gradebook / activity / hybrid), and optional grade category filter.

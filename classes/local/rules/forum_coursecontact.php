@@ -20,7 +20,9 @@ use local_bbcotodobien\local\detail;
 use local_bbcotodobien\local\result;
 
 /**
- * RF-R04: a general forum has a discussion started by a course contact.
+ * RF-R04: a forum has a discussion started by a course contact.
+ *
+ * Single-discussion forums pass automatically because Moodle creates the discussion.
  *
  * @package    local_bbcotodobien
  * @copyright  2026 David Herney @ BambuCo
@@ -85,7 +87,7 @@ class forum_coursecontact extends base {
     }
 
     /**
-     * Evaluate general forums with the given idnumber.
+     * Evaluate forums with the given idnumber.
      *
      * @param \stdClass $course Course record
      * @param array $params Decoded rule parameters
@@ -164,13 +166,14 @@ class forum_coursecontact extends base {
             );
         }
 
-        if (($forum->type ?? '') !== 'general') {
+        // Single forums get one discussion on create/restore; no author check.
+        if (($forum->type ?? '') === 'single') {
             return $this->make_detail(
                 self::GRANULARITY_CM,
                 (int) $cm->id,
                 $name,
-                self::STATUS_FAIL,
-                'ruleforumtypefail'
+                self::STATUS_PASS,
+                'ruleforumsingle_pass'
             );
         }
 
@@ -215,6 +218,7 @@ class forum_coursecontact extends base {
             ]),
             'rulemissinginstance' => get_string('rulemissinginstance', 'local_bbcotodobien'),
             'ruleforumtypefail' => get_string('ruleforumtypefail', 'local_bbcotodobien'),
+            'ruleforumsingle_pass' => get_string('ruleforumsingle_pass', 'local_bbcotodobien'),
             'ruleforumdiscussion_pass' => get_string('ruleforumdiscussion_pass', 'local_bbcotodobien'),
             'ruleforumdiscussion_fail' => get_string('ruleforumdiscussion_fail', 'local_bbcotodobien'),
             default => parent::render_detail($detail),

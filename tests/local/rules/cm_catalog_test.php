@@ -341,7 +341,7 @@ final class cm_catalog_test extends \advanced_testcase {
     }
 
     /**
-     * A general forum started by a course contact passes.
+     * A forum started by a course contact passes.
      */
     public function test_forum_coursecontact_pass(): void {
         global $CFG, $DB;
@@ -368,7 +368,34 @@ final class cm_catalog_test extends \advanced_testcase {
     }
 
     /**
-     * A student discussion is not enough; missing or non-general forums fail.
+     * A single simple discussion forum passes without checking the author.
+     */
+    public function test_forum_coursecontact_single_pass(): void {
+        global $CFG, $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $role = $DB->get_record('role', ['shortname' => 'editingteacher'], '*', MUST_EXIST);
+        $CFG->coursecontact = (string) $role->id;
+        $rule = new forum_coursecontact();
+
+        $this->getDataGenerator()->create_module('forum', [
+            'course' => $course->id,
+            'name' => 'Single',
+            'idnumber' => 'SINGLE',
+            'type' => 'single',
+        ]);
+
+        $result = $rule->evaluate($course, ['idnumber' => 'SINGLE']);
+        $this->assertSame(result::STATUS_PASS, $result->status);
+        $this->assertSame('ruleforumsingle_pass', $result->details[0]->fields['identifier']);
+        $this->assertSame(
+            get_string('ruleforumsingle_pass', 'local_bbcotodobien'),
+            $rule->render_detail($result->details[0])
+        );
+    }
+
+    /**
+     * A student discussion is not enough; missing forums and empty Q and A fail.
      */
     public function test_forum_coursecontact_failures(): void {
         global $CFG, $DB;
@@ -402,12 +429,12 @@ final class cm_catalog_test extends \advanced_testcase {
             'idnumber' => 'QA',
             'type' => 'qanda',
         ]);
-        $wrongtype = $rule->evaluate($course, ['idnumber' => 'QA']);
-        $this->assertSame(result::STATUS_FAIL, $wrongtype->status);
-        $this->assertSame('ruleforumtypefail', $wrongtype->details[0]->fields['identifier']);
+        $emptyqanda = $rule->evaluate($course, ['idnumber' => 'QA']);
+        $this->assertSame(result::STATUS_FAIL, $emptyqanda->status);
+        $this->assertSame('ruleforumdiscussion_fail', $emptyqanda->details[0]->fields['identifier']);
         $this->assertSame(
-            get_string('ruleforumtypefail', 'local_bbcotodobien'),
-            $rule->render_detail($wrongtype->details[0])
+            get_string('ruleforumdiscussion_fail', 'local_bbcotodobien'),
+            $rule->render_detail($emptyqanda->details[0])
         );
     }
 

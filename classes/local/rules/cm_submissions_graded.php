@@ -727,8 +727,11 @@ class cm_submissions_graded extends base {
         $selected = [];
         foreach ($raw as $modname) {
             $modname = clean_param((string) $modname, PARAM_PLUGIN);
-            if ($modname !== '' && in_array($modname, self::SUPPORTED_MODS, true)
-                    && plugin_supports('mod', $modname, FEATURE_GRADE_HAS_GRADE, false)) {
+            if (
+                $modname !== '' &&
+                in_array($modname, self::SUPPORTED_MODS, true) &&
+                plugin_supports('mod', $modname, FEATURE_GRADE_HAS_GRADE, false)
+            ) {
                 $selected[$modname] = $modname;
             }
         }

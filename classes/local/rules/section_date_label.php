@@ -268,8 +268,10 @@ class section_date_label extends base {
     /**
      * Whether the candidate is a date accepted by strtotime() or extra hardcoded formats.
      *
-     * Extra formats currently include d/m/yyyy (1 or 2 digit day/month). Slash dates that
-     * strtotime() already accepts as m/d/yyyy remain valid.
+     * Extra formats currently include d/m/yyyy (1 or 2 digit day/month) and d/month/yyyy
+     * or d-month-yyyy with month names or abbreviations from English and every other language
+     * pack installed on the site. Slash dates that strtotime() already accepts as m/d/yyyy
+     * remain valid.
      *
      * @param string $try Date candidate
      * @return bool
@@ -281,7 +283,7 @@ class section_date_label extends base {
         if (strtotime($try) !== false) {
             return true;
         }
-        return $this->matches_dmy_slash_date($try);
+        return $this->matches_dmy_slash_date($try) || $this->matches_dmy_named_month_date($try);
     }
 
     /**
@@ -295,5 +297,101 @@ class section_date_label extends base {
             return false;
         }
         return checkdate((int) $matches[2], (int) $matches[1], (int) $matches[3]);
+    }
+
+    /**
+     * Whether the candidate is a valid calendar date with a named month.
+     *
+     * Accepts d/month/yyyy and d-month-yyyy where month is a full name or abbreviation
+     * (case-insensitive) taken from English and the other language packs installed on the site.
+     *
+     * @param string $try Date candidate
+     * @return bool
+     */
+    protected function matches_dmy_named_month_date(string $try): bool {
+        if (!preg_match('/^(\d{1,2})[\/-]([\p{L}]+)[\/-](\d{4})$/u', $try, $matches)) {
+            return false;
+        }
+        $month = $this->named_month_to_number(mb_strtolower($matches[2], 'UTF-8'));
+        if ($month === null) {
+            return false;
+        }
+        return checkdate($month, (int) $matches[1], (int) $matches[3]);
+    }
+
+    /**
+     * Map a month name or abbreviation to a 1–12 month number.
+     *
+     * Names come from English plus every other installed language pack.
+     *
+     * @param string $name Lowercased month token
+     * @return int|null Month number or null when unknown
+     */
+    protected function named_month_to_number(string $name): ?int {
+        $months = $this->get_named_month_map();
+        return $months[$name] ?? null;
+    }
+
+    /**
+     * Build and cache the month-name map for the installed languages.
+     *
+     * @return array<string, int> Lowercased token => month number
+     */
+    protected function get_named_month_map(): array {
+        static $months = null;
+        if ($months !== null) {
+            return $months;
+        }
+
+        $months = [];
+        $langs = array_keys(get_string_manager()->get_list_of_translations());
+        if (!in_array('en', $langs, true)) {
+            array_unshift($langs, 'en');
+        }
+        foreach ($langs as $lang) {
+            $this->add_language_months_to_map($months, (string) $lang);
+        }
+        return $months;
+    }
+
+    /**
+     * Register full names, abbreviations and 3-letter prefixes for one language.
+     *
+     * @param array<string, int> $months Map to extend
+     * @param string $lang Language code
+     */
+    protected function add_language_months_to_map(array &$months, string $lang): void {
+        $locale = get_string_manager()->get_string('locale', 'langconfig', null, $lang);
+        if ($locale === '' || $locale === '[[locale]]') {
+            return;
+        }
+
+        $date = new \DateTime('@1263556800');
+        $date->setTimezone(new \DateTimeZone('UTC'));
+        for ($month = 1; $month <= 12; $month++) {
+            $date->setDate(2000, $month, 15);
+            $full = $this->normalise_month_token(\core_date::strftime('%B', $date, $locale));
+            $abbr = $this->normalise_month_token(\core_date::strftime('%b', $date, $locale));
+            if ($full !== '') {
+                $months[$full] = $month;
+                if (mb_strlen($full, 'UTF-8') > 3) {
+                    $months[mb_substr($full, 0, 3, 'UTF-8')] = $month;
+                }
+            }
+            if ($abbr !== '') {
+                $months[$abbr] = $month;
+            }
+        }
+    }
+
+    /**
+     * Lowercase a month token and strip trailing punctuation.
+     *
+     * @param string $token Raw month name from the locale
+     * @return string
+     */
+    protected function normalise_month_token(string $token): string {
+        $token = mb_strtolower(trim($token), 'UTF-8');
+        return rtrim($token, '.,;:');
     }
 }
