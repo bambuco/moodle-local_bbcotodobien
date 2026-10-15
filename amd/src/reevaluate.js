@@ -91,7 +91,7 @@ const showStaleNotice = (row) => {
  * @param {Object} response Web service payload
  * @return {Promise}
  */
-const updateRuleRow  = async(row, response) => {
+const updateRuleRow = async(row, response) => {
     const previousStatus = row.dataset.status || '';
     const statusChanged = previousStatus !== response.status;
 
