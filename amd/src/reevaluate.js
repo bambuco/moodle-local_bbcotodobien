@@ -64,7 +64,7 @@ const resolveStatusKey = (status) => STATUS_ICONS[status] ? status : 'na';
  * @param {string} status Raw status from the web service
  * @return {Promise<{icon: string, label: string}>}
  */
-const renderStatus = async (status) => {
+const renderStatus = async(status) => {
     const key = resolveStatusKey(status);
     const label = await getString('status' + key, 'local_bbcotodobien');
     const icon = await Templates.renderPix(STATUS_ICONS[key], 'core', label);
@@ -91,7 +91,7 @@ const showStaleNotice = (row) => {
  * @param {Object} response Web service payload
  * @return {Promise}
  */
-const updateRuleRow = async (row, response) => {
+const updateRuleRow  = async(row, response) => {
     const previousStatus = row.dataset.status || '';
     const statusChanged = previousStatus !== response.status;
 

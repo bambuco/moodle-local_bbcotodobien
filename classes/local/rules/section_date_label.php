@@ -335,7 +335,7 @@ class section_date_label extends base {
     /**
      * Build and cache the month-name map for the installed languages.
      *
-     * @return array<string, int> Lowercased token => month number
+     * @return array Lowercased token => month number
      */
     protected function get_named_month_map(): array {
         static $months = null;
@@ -357,7 +357,7 @@ class section_date_label extends base {
     /**
      * Register full names, abbreviations and 3-letter prefixes for one language.
      *
-     * @param array<string, int> $months Map to extend
+     * @param array $months Map to extend
      * @param string $lang Language code
      */
     protected function add_language_months_to_map(array &$months, string $lang): void {
