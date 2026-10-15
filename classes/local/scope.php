@@ -21,6 +21,8 @@ namespace local_bbcotodobien\local;
  *
  * An empty categories CSV means the type applies to the whole site.
  * A type assigned to a parent category applies to courses in all descendant categories.
+ * Lookups ignore the current user's visibility. Moodle 5.2 enables forcelogin by default,
+ * so a guest or CLI user would otherwise see every category as missing.
  *
  * @package    local_bbcotodobien
  * @copyright  2026 David Herney @ BambuCo
@@ -79,7 +81,7 @@ class scope {
         }
         $names = [];
         foreach ($ids as $id) {
-            $category = \core_course_category::get($id, IGNORE_MISSING);
+            $category = \core_course_category::get($id, IGNORE_MISSING, true);
             if ($category) {
                 $names[] = $category->get_formatted_name();
             } else {
@@ -96,7 +98,7 @@ class scope {
      * @return int[]
      */
     public static function get_category_chain(int $categoryid): array {
-        $category = \core_course_category::get($categoryid, IGNORE_MISSING);
+        $category = \core_course_category::get($categoryid, IGNORE_MISSING, true);
         if (!$category) {
             return [];
         }
@@ -112,7 +114,7 @@ class scope {
      * @return int[]
      */
     public static function get_category_tree_ids(int $categoryid): array {
-        $category = \core_course_category::get($categoryid, IGNORE_MISSING);
+        $category = \core_course_category::get($categoryid, IGNORE_MISSING, true);
         if (!$category) {
             return [];
         }
