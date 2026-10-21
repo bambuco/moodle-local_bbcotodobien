@@ -226,6 +226,58 @@ class cm_submissions_graded extends base {
     }
 
     /**
+     * Summary of activities that meet or miss the submission coverage requirement.
+     *
+     * @param detail[] $details All details from one evaluation
+     * @return string|null
+     */
+    public function render_summary(array $details): ?string {
+        $passed = 0;
+        $failed = 0;
+        foreach ($details as $detail) {
+            $identifier = (string) ($detail->fields['identifier'] ?? '');
+            if ($identifier === 'rulesubmissionsgraded_pass') {
+                $passed++;
+            } else if ($identifier === 'rulesubmissionsgraded_fail') {
+                $failed++;
+            }
+        }
+        $evaluated = $passed + $failed;
+        if ($evaluated === 0) {
+            return null;
+        }
+
+        if ($failed > 0) {
+            $percent = round(($failed / $evaluated) * 100, 2);
+            return get_string('rulesubmissionsgraded_activities_fail', 'local_bbcotodobien', (object) [
+                'failed' => $failed,
+                'evaluated' => $evaluated,
+                'percent' => format_float($percent, 2),
+            ]);
+        }
+
+        return get_string('rulesubmissionsgraded_activities_pass', 'local_bbcotodobien', (object) [
+            'passed' => $passed,
+            'evaluated' => $evaluated,
+            'percent' => format_float(100, 2),
+        ]);
+    }
+
+    /**
+     * Per-activity submission coverage note for a failing list item.
+     *
+     * @param detail $detail Failing detail
+     * @return string
+     */
+    public function render_failing_item_note(detail $detail): string {
+        $identifier = (string) ($detail->fields['identifier'] ?? '');
+        if ($identifier !== 'rulesubmissionsgraded_fail') {
+            return '';
+        }
+        return get_string('rulesubmissionsgraded_fail', 'local_bbcotodobien', (object) $detail->fields);
+    }
+
+    /**
      * Evaluate one course module, or null when not applicable.
      *
      * @param \stdClass $course Course record

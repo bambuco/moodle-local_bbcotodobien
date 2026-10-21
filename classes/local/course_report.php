@@ -217,9 +217,26 @@ class course_report {
      * @return string HTML
      */
     protected static function render_execution_messages(?base $rule, array $rows, bool $hasfailinggroups): string {
+        $alldetails = [];
+        foreach ($rows as $row) {
+            $alldetails[] = detail::from_storage(
+                $row->targettype,
+                (int) $row->targetid,
+                $row->targetname,
+                $row->status,
+                (string) $row->details
+            );
+        }
+        if ($rule) {
+            $summary = $rule->render_summary($alldetails);
+            if ($summary !== null) {
+                return $summary;
+            }
+        }
+
         $htmlparts = [];
         $seen = [];
-        foreach ($rows as $row) {
+        foreach ($rows as $index => $row) {
             $listed = self::is_listable_fail_target($row->targettype);
             if (
                 $listed
@@ -230,13 +247,7 @@ class course_report {
                 continue;
             }
 
-            $detail = detail::from_storage(
-                $row->targettype,
-                (int) $row->targetid,
-                $row->targetname,
-                $row->status,
-                (string) $row->details
-            );
+            $detail = $alldetails[$index];
             $identifier = (string) ($detail->fields['identifier'] ?? '');
             $key = $identifier !== '' ? $identifier : 'row-' . $row->id;
             if (isset($seen[$key])) {
@@ -309,10 +320,13 @@ class course_report {
             }
 
             $name = $category ? $category->fullname : $row->targetname;
+            $note = $rule ? $rule->render_failing_item_note($detail) : '';
             $groups[$groupkey]['items'][] = [
                 'name' => format_string($name),
                 'url' => $url ? $url->out(false) : '',
                 'hasurl' => $url !== null,
+                'note' => $note,
+                'hasnote' => $note !== '',
             ];
         }
 

@@ -37,8 +37,8 @@
                     {
                         "intro": "The following sections do not contain the label \"Start:\".",
                         "items": [
-                            {"name": "Topic 1", "url": "https://example.com/course/section.php?id=2", "hasurl": true},
-                            {"name": "Topic 2", "url": "", "hasurl": false}
+                            {"name": "Topic 1", "url": "https://example.com/course/section.php?id=2", "hasurl": true, "note": "", "hasnote": false},
+                            {"name": "Topic 2", "url": "", "hasurl": false, "note": "1 of 5 submissions meet the requirement (20.00%), below the required 80.00%.", "hasnote": true}
                         ]
                     }
                 ]
@@ -80,6 +80,9 @@
                                                     {{^hasurl}}
                                                         {{name}}
                                                     {{/hasurl}}
+                                                    {{#hasnote}}
+                                                        <span> - {{note}}</span>
+                                                    {{/hasnote}}
                                                 </li>
                                             {{/items}}
                                         </ul>

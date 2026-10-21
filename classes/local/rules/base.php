@@ -206,6 +206,26 @@ abstract class base {
     }
 
     /**
+     * Optional summary line for one evaluation, replacing per-detail messages.
+     *
+     * @param detail[] $details All details from one evaluation
+     * @return string|null Summary HTML, or null to keep the default messages
+     */
+    public function render_summary(array $details): ?string {
+        return null;
+    }
+
+    /**
+     * Optional note shown next to a failing listed target.
+     *
+     * @param detail $detail Failing detail
+     * @return string Note text, or empty string when none
+     */
+    public function render_failing_item_note(detail $detail): string {
+        return '';
+    }
+
+    /**
      * Intro text for a grouped list of failing found resources.
      *
      * Prefers a rule-specific "{identifier}_list" string; otherwise uses a

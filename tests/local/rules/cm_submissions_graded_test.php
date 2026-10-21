@@ -16,6 +16,9 @@
 
 namespace local_bbcotodobien\local\rules;
 
+use local_bbcotodobien\local\audit_type_manager;
+use local_bbcotodobien\local\course_report;
+use local_bbcotodobien\local\engine;
 use local_bbcotodobien\local\result;
 
 /**
@@ -314,6 +317,92 @@ final class cm_submissions_graded_test extends \advanced_testcase {
         $result = (new cm_submissions_graded())->evaluate($course, ['threshold' => 150]);
         $this->assertSame(result::STATUS_ERROR, $result->status);
         $this->assertSame('rulethresholdinvalid', $result->details[0]->fields['identifier']);
+    }
+
+    /**
+     * Detail export summarises activities and shows per-activity submission notes.
+     */
+    public function test_export_rule_detail_activity_summary_and_notes(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $course = $this->getDataGenerator()->create_course();
+        $student1 = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $student2 = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $userids = [(int) $student1->id, (int) $student2->id];
+
+        $passassign = $this->create_assign_with_submissions($course, $userids, 'Pass task');
+        $this->grade_assign_user($course, $passassign, (int) $student1->id, 80);
+        $this->grade_assign_user($course, $passassign, (int) $student2->id, 90);
+
+        $halfassign = $this->create_assign_with_submissions($course, $userids, 'Half task');
+        $this->grade_assign_user($course, $halfassign, (int) $student1->id, 70);
+
+        $noneassign = $this->create_assign_with_submissions($course, $userids, 'None task');
+
+        $typeid = audit_type_manager::create_type('Quality');
+        $ruleid = audit_type_manager::create_rule_config($typeid, [
+            'ruleclass' => cm_submissions_graded::class,
+            'name' => 'Submissions graded',
+            'mandatory' => true,
+            'params' => [
+                'modnames' => ['assign'],
+                'threshold' => 100,
+                'checkmode' => cm_submissions_graded::CHECKMODE_GRADE,
+            ],
+        ]);
+        engine::run_audit($course->id, $typeid, 0);
+
+        $data = course_report::export_rule_detail($course, $ruleid);
+        $this->assertCount(1, $data['details']);
+        $execution = $data['details'][0];
+        $expectedsummary = get_string('rulesubmissionsgraded_activities_fail', 'local_bbcotodobien', (object) [
+            'failed' => 2,
+            'evaluated' => 3,
+            'percent' => format_float(round((2 / 3) * 100, 2), 2),
+        ]);
+        $this->assertSame($expectedsummary, $execution['details']);
+        $this->assertStringNotContainsString(
+            get_string('rulesubmissionsgraded_fail', 'local_bbcotodobien', (object) [
+                'graded' => 1,
+                'total' => 2,
+                'percent' => format_float(50, 2),
+                'threshold' => format_float(100, 2),
+            ]),
+            $execution['details']
+        );
+
+        $this->assertTrue($execution['hasfailinggroups']);
+        $this->assertCount(1, $execution['failinggroups']);
+        $items = $execution['failinggroups'][0]['items'];
+        $this->assertCount(2, $items);
+
+        $notesbyname = [];
+        foreach ($items as $item) {
+            $this->assertTrue($item['hasnote']);
+            $notesbyname[$item['name']] = $item['note'];
+        }
+        $this->assertArrayHasKey('Half task', $notesbyname);
+        $this->assertArrayHasKey('None task', $notesbyname);
+        $this->assertSame(
+            get_string('rulesubmissionsgraded_fail', 'local_bbcotodobien', (object) [
+                'graded' => 1,
+                'total' => 2,
+                'percent' => format_float(50, 2),
+                'threshold' => format_float(100, 2),
+            ]),
+            $notesbyname['Half task']
+        );
+        $this->assertSame(
+            get_string('rulesubmissionsgraded_fail', 'local_bbcotodobien', (object) [
+                'graded' => 0,
+                'total' => 2,
+                'percent' => format_float(0, 2),
+                'threshold' => format_float(100, 2),
+            ]),
+            $notesbyname['None task']
+        );
+        $this->assertArrayNotHasKey('Pass task', $notesbyname);
     }
 
     /**
