@@ -236,7 +236,8 @@ class course_report {
 
         $htmlparts = [];
         $seen = [];
-        foreach ($rows as $index => $row) {
+
+        foreach (array_values($rows) as $index => $row) {
             $listed = self::is_listable_fail_target($row->targettype);
             if (
                 $listed

@@ -246,6 +246,49 @@ final class course_report_test extends \advanced_testcase {
     }
 
     /**
+     * Detail messages resolve when rule_detail rows are keyed by database id.
+     */
+    public function test_export_rule_detail_handles_non_sequential_detail_ids(): void {
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+        $typeid = audit_type_manager::create_type('Quality');
+        $ruleid = audit_type_manager::create_rule_config($typeid, [
+            'ruleclass' => stub_rule::class,
+            'name' => get_string('stubrule', 'local_bbcotodobien'),
+            'mandatory' => true,
+            'params' => [
+                'items' => [
+                    [
+                        'targetid' => 1,
+                        'targetname' => 'One',
+                        'status' => result::STATUS_FAIL,
+                        'identifier' => 'stubrulefailed',
+                    ],
+                    [
+                        'targetid' => 2,
+                        'targetname' => 'Two',
+                        'status' => result::STATUS_FAIL,
+                        'identifier' => 'stubrulefailed',
+                    ],
+                    [
+                        'targetid' => 3,
+                        'targetname' => 'Three',
+                        'status' => result::STATUS_PASS,
+                        'identifier' => 'stubrulepassed',
+                    ],
+                ],
+            ],
+        ]);
+        engine::run_audit($course->id, $typeid, 0);
+
+        $data = course_report::export_rule_detail($course, $ruleid);
+        $this->assertCount(1, $data['details']);
+        $this->assertSame(get_string('stubrulefailed', 'local_bbcotodobien'), $data['details'][0]['details']);
+        $this->assertTrue($data['details'][0]['hasfailinggroups']);
+        $this->assertCount(2, $data['details'][0]['failinggroups'][0]['items']);
+    }
+
+    /**
      * All-pass evaluations do not attach a failing list.
      */
     public function test_export_rule_detail_omits_failing_groups_when_all_pass(): void {
