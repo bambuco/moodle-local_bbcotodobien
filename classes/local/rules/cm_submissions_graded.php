@@ -371,12 +371,17 @@ class cm_submissions_graded extends base {
     /**
      * Whether a quiz contains at least one manually graded question type.
      *
+     * Fixed slots use the question type flag. Random slots inspect the selected
+     * category (and optional subcategories) for a manually graded type that random
+     * questions can pick.
+     *
      * @param \cm_info $cm Course module
      * @return bool
      */
     protected function quiz_requires_manual_grading(\cm_info $cm): bool {
         global $CFG;
         require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+        require_once($CFG->libdir . '/questionlib.php');
 
         try {
             $quizobj = \mod_quiz\quiz_settings::create((int) $cm->instance, 0);
@@ -390,6 +395,12 @@ class cm_submissions_graded extends base {
             if ($qtype === '' || $qtype === 'missingtype') {
                 continue;
             }
+            if ($qtype === 'random') {
+                if ($this->random_slot_requires_manual_grading($slot)) {
+                    return true;
+                }
+                continue;
+            }
             if (!\question_bank::is_qtype_installed($qtype)) {
                 continue;
             }
@@ -399,6 +410,94 @@ class cm_submissions_graded extends base {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a random quiz slot can select a manually graded question.
+     *
+     * @param \stdClass $slot Quiz structure slot with filtercondition data
+     * @return bool
+     */
+    protected function random_slot_requires_manual_grading(\stdClass $slot): bool {
+        global $DB;
+
+        $manualqtypes = $this->get_manual_qtypes_usable_by_random();
+        if (!$manualqtypes) {
+            return false;
+        }
+
+        $categoryid = $this->get_random_slot_categoryid($slot);
+        if ($categoryid <= 0) {
+            return false;
+        }
+
+        $includesubcategories = false;
+        $filter = $slot->filtercondition['filter']['category']['filteroptions'] ?? null;
+        if (is_array($filter)) {
+            $includesubcategories = !empty($filter['includesubcategories']);
+        }
+
+        $categoryids = $includesubcategories
+            ? array_map('intval', question_categorylist($categoryid))
+            : [$categoryid];
+        if (!$categoryids) {
+            return false;
+        }
+
+        [$catsql, $catparams] = $DB->get_in_or_equal($categoryids, SQL_PARAMS_NAMED, 'cat');
+        [$typesql, $typeparams] = $DB->get_in_or_equal($manualqtypes, SQL_PARAMS_NAMED, 'qt');
+        $params = $catparams + $typeparams;
+        $params['status'] = \core_question\local\bank\question_version_status::QUESTION_STATUS_READY;
+
+        $sql = "SELECT 1
+                  FROM {question} q
+                  JOIN {question_versions} qv ON qv.questionid = q.id
+                  JOIN {question_bank_entries} qbe ON qbe.id = qv.questionbankentryid
+                 WHERE qbe.questioncategoryid {$catsql}
+                   AND q.parent = 0
+                   AND qv.status = :status
+                   AND q.qtype {$typesql}";
+
+        return $DB->record_exists_sql($sql, $params);
+    }
+
+    /**
+     * Category id selected by a random quiz slot.
+     *
+     * @param \stdClass $slot Quiz structure slot
+     * @return int
+     */
+    protected function get_random_slot_categoryid(\stdClass $slot): int {
+        $raw = $slot->filtercondition['filter']['category']['values'][0]
+            ?? $slot->category
+            ?? 0;
+        if (is_string($raw) && str_contains($raw, ',')) {
+            $raw = explode(',', $raw, 2)[0];
+        }
+        return (int) $raw;
+    }
+
+    /**
+     * Manually graded question type names that random questions may select.
+     *
+     * @return string[]
+     */
+    protected function get_manual_qtypes_usable_by_random(): array {
+        static $manualqtypes = null;
+        if ($manualqtypes !== null) {
+            return $manualqtypes;
+        }
+
+        $manualqtypes = [];
+        foreach (\question_bank::get_all_qtypes() as $qtype) {
+            if (!$qtype->is_usable_by_random()) {
+                continue;
+            }
+            if ($qtype->is_manual_graded()) {
+                $manualqtypes[] = $qtype->name();
+            }
+        }
+        return $manualqtypes;
     }
 
     /**

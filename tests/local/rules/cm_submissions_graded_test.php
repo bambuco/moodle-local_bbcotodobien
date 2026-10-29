@@ -225,6 +225,97 @@ final class cm_submissions_graded_test extends \advanced_testcase {
     }
 
     /**
+     * Random quizzes from auto-only banks are omitted; essay in the bank is evaluated.
+     */
+    public function test_quiz_random_auto_omitted_essay_pool_evaluated(): void {
+        global $CFG;
+        require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $course = $this->getDataGenerator()->create_course();
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $quizgenerator = $this->getDataGenerator()->get_plugin_generator('mod_quiz');
+        $questiongenerator = $this->getDataGenerator()->get_plugin_generator('core_question');
+
+        $autocategory = $questiongenerator->create_question_category();
+        $autoquestion = $questiongenerator->create_question('truefalse', null, [
+            'category' => $autocategory->id,
+        ]);
+        $autoquiz = $quizgenerator->create_instance([
+            'course' => $course->id,
+            'grade' => 100,
+            'sumgrades' => 1,
+        ]);
+        $this->add_random_questions_to_quiz((int) $autoquiz->id, 1, (int) $autocategory->id, 1);
+        \mod_quiz\quiz_settings::create((int) $autoquiz->id)->get_grade_calculator()->recompute_quiz_sumgrades();
+
+        $manualcategory = $questiongenerator->create_question_category();
+        $questiongenerator->create_question('truefalse', null, ['category' => $manualcategory->id]);
+        $essay = $questiongenerator->create_question('essay', null, ['category' => $manualcategory->id]);
+        $manualquiz = $quizgenerator->create_instance([
+            'course' => $course->id,
+            'grade' => 100,
+            'sumgrades' => 1,
+        ]);
+        $this->add_random_questions_to_quiz((int) $manualquiz->id, 1, (int) $manualcategory->id, 1);
+        \mod_quiz\quiz_settings::create((int) $manualquiz->id)->get_grade_calculator()->recompute_quiz_sumgrades();
+
+        $this->setUser($student);
+        $autoattempt = $quizgenerator->create_attempt(
+            (int) $autoquiz->id,
+            (int) $student->id,
+            [1 => (int) $autoquestion->id]
+        );
+        $quizgenerator->submit_responses((int) $autoattempt->id, [1 => 'True'], false, true);
+        $manualattempt = $quizgenerator->create_attempt(
+            (int) $manualquiz->id,
+            (int) $student->id,
+            [1 => (int) $essay->id]
+        );
+        $quizgenerator->submit_responses((int) $manualattempt->id, [1 => 'An essay answer'], false, true);
+        $this->setAdminUser();
+
+        $rule = new cm_submissions_graded();
+        $result = $rule->evaluate($course, [
+            'modnames' => ['quiz'],
+            'threshold' => 100,
+            'checkmode' => cm_submissions_graded::CHECKMODE_GRADE,
+        ]);
+        $this->assertCount(1, $result->details);
+        $modinfo = get_fast_modinfo($course);
+        $this->assertSame(
+            (int) $modinfo->instances['quiz'][$manualquiz->id]->id,
+            (int) $result->details[0]->targetid
+        );
+        $this->assertSame(result::STATUS_FAIL, $result->status);
+    }
+
+    /**
+     * Add random questions to a quiz from a category.
+     *
+     * @param int $quizid Quiz id
+     * @param int $page Page number
+     * @param int $categoryid Question category id
+     * @param int $number Number of random questions
+     */
+    protected function add_random_questions_to_quiz(int $quizid, int $page, int $categoryid, int $number): void {
+        $quizobj = \mod_quiz\quiz_settings::create($quizid);
+        $structure = $quizobj->get_structure();
+        $filtercondition = [
+            'filter' => [
+                'category' => [
+                    'jointype' => \core_question\local\bank\condition::JOINTYPE_DEFAULT,
+                    'values' => [$categoryid],
+                    'filteroptions' => ['includesubcategories' => false],
+                ],
+            ],
+        ];
+        $structure->add_random_questions($page, $number, $filtercondition);
+    }
+
+    /**
      * Forum whole-forum grading uses posters among gradable users as denominator.
      */
     public function test_forum_posters_denominator(): void {
